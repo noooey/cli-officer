@@ -34,6 +34,7 @@ class Supervisor:
         if lines != self.history:
             self.history = list(lines)
             self.last_change_at = current_time
+            self.last_handled_signature = ""
             return self._evaluate_lines(lines, stalled=False)
         if current_time - self.last_change_at < self.stall_seconds:
             return SupervisorResult(None, None, "noop")
@@ -146,6 +147,9 @@ class Supervisor:
                 trimmed.pop()
                 continue
             if stripped.startswith("› ") or stripped.startswith("> "):
+                trimmed.pop()
+                continue
+            if stripped in {"│", "|"}:
                 trimmed.pop()
                 continue
             break

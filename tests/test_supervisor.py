@@ -259,6 +259,27 @@ class SupervisorTests(unittest.TestCase):
         self.assertEqual(second.action_taken, "noop")
         self.assertEqual(client.sent, [("%1", "yes")])
 
+    def test_stalled_worker_rechecks_wrapped_approval_context(self) -> None:
+        times = iter([0.0, 3.0])
+        client = FakeTmuxClient([
+            [
+                "원하면 다음 단계로 바로 이어서 E2E 테스트 시나리오 목록이나",
+                "Playwright 기준 테스트 케이스 표 형태로 정리해드리겠습니다.",
+            ],
+            [
+                "원하면 다음 단계로 바로 이어서 E2E 테스트 시나리오 목록이나",
+                "Playwright 기준 테스트 케이스 표 형태로 정리해드리겠습니다.",
+            ],
+        ])
+        supervisor = Supervisor(client, HeuristicJudge(), "%1", dry_run=False, now=lambda: next(times), stall_seconds=2.0)
+
+        first = supervisor.poll_once()
+        second = supervisor.poll_once()
+
+        self.assertEqual(first.action_taken, "auto-replied")
+        self.assertEqual(second.action_taken, "noop")
+        self.assertEqual(client.sent, [("%1", "yes")])
+
     def test_stalled_worker_can_skip_non_prompt_context(self) -> None:
         times = iter([0.0, 3.0])
         judge = NoReplyJudge()

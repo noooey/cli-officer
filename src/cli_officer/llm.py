@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 import re
+import sys
 from urllib import error, parse, request
 
 from .config import ProviderConfig
@@ -88,15 +89,8 @@ class APIDecisionJudge(Judge):
             payload = self._call_api(interrupt)
             return self._parse_decision(payload)
         except (OSError, ValueError, KeyError, error.URLError, error.HTTPError, json.JSONDecodeError) as exc:
-            return Decision(
-                interrupt_detected=True,
-                risk_level="unknown",
-                mode=DecisionMode.SUGGEST,
-                reply="",
-                confidence=0.0,
-                rationale=f"LLM API unavailable: {exc}",
-                needs_reply=True,
-            )
+            print(f"[officer] LLM API unavailable: {exc}; falling back to heuristic", file=sys.stderr, flush=True)
+            return self.fallback.decide(interrupt)
 
     def _call_api(self, interrupt: Interrupt) -> dict:
         if self.config.officer_provider == "openai":
