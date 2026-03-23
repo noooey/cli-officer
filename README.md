@@ -4,6 +4,8 @@
 
 It captures pane output, detects likely input requests, runs a judge, applies hard safety policy, and optionally injects replies back into the worker pane.
 
+Python requirement: `>=3.10`
+
 ## Scope
 
 - Generic design for any worker CLI
