@@ -54,7 +54,7 @@ def main() -> int:
                 session_name=args.session_name,
                 workdir=args.workdir,
             )
-            target = bootstrapped.officer_pane
+            target = bootstrapped.worker_pane
             print(
                 json.dumps(
                     {
@@ -77,6 +77,7 @@ def main() -> int:
             judge=build_judge(config),
             target=target,
             dry_run=args.dry_run,
+            log_events=True,
         )
         if args.once:
             result = supervisor.poll_once()
