@@ -1,6 +1,6 @@
 # cli-officer
 
-`cli-officer` is a Python MVP for supervising a long-running worker pane in tmux.
+`cli-officer` is a Python MVP for running an officer beside a long-running worker pane in tmux.
 
 It captures pane output, detects likely input requests, runs a judge, applies hard safety policy, and optionally injects replies back into the worker pane.
 
@@ -12,7 +12,7 @@ It captures pane output, detects likely input requests, runs a judge, applies ha
 
 ## Safety defaults
 
-The supervisor never auto-approves:
+The officer never auto-approves:
 
 - deletion or removal actions
 - git push, merge, rebase, force operations
@@ -68,10 +68,10 @@ After that, you can run `cli-officer` from any repository.
 
 On the first run, `cli-officer` asks you to configure two things:
 
-- Officer supervisor model provider
+- Officer model provider
 - Coding agent
 
-Supervisor provider choices:
+Officer provider choices:
 
 - OpenAI -> fixed model `gpt-5-mini`
 - Anthropic -> fixed model `claude-3-5-sonnet-latest`
@@ -81,7 +81,7 @@ Coding agent choices:
 - `claude-code`
 - `codex`
 
-Then it asks for the selected supervisor provider API key.
+Then it asks for the selected officer provider API key.
 
 The config is stored at `~/.config/cli-officer/config.json` with file mode `600`.
 

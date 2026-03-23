@@ -60,9 +60,9 @@ class SupervisorTests(unittest.TestCase):
             try:
                 save_config(
                     ProviderConfig(
-                        supervisor_provider="openai",
-                        supervisor_model="gpt-5-mini",
-                        supervisor_api_key="secret",
+                        officer_provider="openai",
+                        officer_model="gpt-5-mini",
+                        officer_api_key="secret",
                         coding_agent="codex",
                     )
                 )
@@ -74,16 +74,16 @@ class SupervisorTests(unittest.TestCase):
                     os.environ["CLI_OFFICER_CONFIG"] = old_value
 
             self.assertIsNotNone(loaded)
-            self.assertEqual(loaded.supervisor_provider, "openai")
-            self.assertEqual(loaded.supervisor_model, "gpt-5-mini")
+            self.assertEqual(loaded.officer_provider, "openai")
+            self.assertEqual(loaded.officer_model, "gpt-5-mini")
             self.assertEqual(loaded.coding_agent, "codex")
 
     def test_launcher_uses_selected_coding_agent(self) -> None:
         client = FakeTmuxClient([])
         config = ProviderConfig(
-            supervisor_provider="openai",
-            supervisor_model="gpt-5-mini",
-            supervisor_api_key="secret",
+            officer_provider="openai",
+            officer_model="gpt-5-mini",
+            officer_api_key="secret",
             coding_agent="codex",
         )
 
@@ -98,9 +98,9 @@ class SupervisorTests(unittest.TestCase):
 
     def test_resolve_worker_command_for_claude(self) -> None:
         config = ProviderConfig(
-            supervisor_provider="anthropic",
-            supervisor_model="claude-3-5-sonnet-latest",
-            supervisor_api_key="secret",
+            officer_provider="anthropic",
+            officer_model="claude-3-5-sonnet-latest",
+            officer_api_key="secret",
             coding_agent="claude-code",
         )
 

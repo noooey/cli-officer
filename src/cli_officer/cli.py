@@ -34,8 +34,8 @@ def main() -> int:
         print(
             json.dumps(
                 {
-                    "supervisor_provider": config.supervisor_provider,
-                    "supervisor_model": config.supervisor_model,
+                    "officer_provider": config.officer_provider,
+                    "officer_model": config.officer_model,
                     "coding_agent": config.coding_agent,
                 }
             )

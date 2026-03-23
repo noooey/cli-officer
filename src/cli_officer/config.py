@@ -16,9 +16,9 @@ CODING_AGENTS: tuple[str, str] = ("claude-code", "codex")
 
 @dataclass(slots=True)
 class ProviderConfig:
-    supervisor_provider: str
-    supervisor_model: str
-    supervisor_api_key: str
+    officer_provider: str
+    officer_model: str
+    officer_api_key: str
     coding_agent: str
 
 
@@ -34,10 +34,13 @@ def load_config() -> ProviderConfig | None:
     if not path.exists():
         return None
     payload = json.loads(path.read_text(encoding="utf-8"))
+    officer_provider = payload.get("officer_provider", payload.get("supervisor_provider"))
+    officer_model = payload.get("officer_model", payload.get("supervisor_model"))
+    officer_api_key = payload.get("officer_api_key", payload.get("supervisor_api_key"))
     return ProviderConfig(
-        supervisor_provider=payload["supervisor_provider"],
-        supervisor_model=payload["supervisor_model"],
-        supervisor_api_key=payload["supervisor_api_key"],
+        officer_provider=officer_provider,
+        officer_model=officer_model,
+        officer_api_key=officer_api_key,
         coding_agent=payload["coding_agent"],
     )
 
@@ -60,7 +63,7 @@ def ensure_config() -> ProviderConfig:
 
 def run_first_time_setup() -> ProviderConfig:
     print("cli-officer first-time setup")
-    print("Choose officer supervisor model provider:")
+    print("Choose officer model provider:")
     print("1. OpenAI")
     print("2. Anthropic")
     provider = ""
@@ -74,7 +77,7 @@ def run_first_time_setup() -> ProviderConfig:
     while not api_key:
         api_key = getpass(f"{provider} API key: ").strip()
     model = DEFAULT_MODELS[provider]
-    print(f"Using fixed supervisor model: {model}")
+    print(f"Using fixed officer model: {model}")
     print("Choose coding agent:")
     print("1. claude-code")
     print("2. codex")
@@ -87,8 +90,8 @@ def run_first_time_setup() -> ProviderConfig:
             coding_agent = "codex"
     print(f"Config will be stored at: {get_config_path()}")
     return ProviderConfig(
-        supervisor_provider=provider,
-        supervisor_model=model,
-        supervisor_api_key=api_key,
+        officer_provider=provider,
+        officer_model=model,
+        officer_api_key=api_key,
         coding_agent=coding_agent,
     )

@@ -39,7 +39,7 @@ class HeuristicJudge(Judge):
         return ""
 
 
-SYSTEM_PROMPT = """You are a CLI supervisor for a coding agent.
+SYSTEM_PROMPT = """You are a CLI officer for a coding agent.
 Return JSON only with keys:
 interrupt_detected, risk_level, mode, reply, confidence, rationale
 
@@ -71,15 +71,15 @@ class APIDecisionJudge(Judge):
             )
 
     def _call_api(self, interrupt: Interrupt) -> dict:
-        if self.config.supervisor_provider == "openai":
+        if self.config.officer_provider == "openai":
             return self._call_openai(interrupt)
-        if self.config.supervisor_provider == "anthropic":
+        if self.config.officer_provider == "anthropic":
             return self._call_anthropic(interrupt)
-        raise ValueError(f"Unsupported provider: {self.config.supervisor_provider}")
+        raise ValueError(f"Unsupported provider: {self.config.officer_provider}")
 
     def _call_openai(self, interrupt: Interrupt) -> dict:
         body = {
-            "model": self.config.supervisor_model,
+            "model": self.config.officer_model,
             "input": [
                 {"role": "system", "content": [{"type": "input_text", "text": SYSTEM_PROMPT}]},
                 {"role": "user", "content": [{"type": "input_text", "text": self._build_user_prompt(interrupt)}]},
@@ -89,7 +89,7 @@ class APIDecisionJudge(Judge):
             "https://api.openai.com/v1/responses",
             data=json.dumps(body).encode("utf-8"),
             headers={
-                "Authorization": f"Bearer {self.config.supervisor_api_key}",
+                "Authorization": f"Bearer {self.config.officer_api_key}",
                 "Content-Type": "application/json",
             },
             method="POST",
@@ -103,7 +103,7 @@ class APIDecisionJudge(Judge):
 
     def _call_anthropic(self, interrupt: Interrupt) -> dict:
         body = {
-            "model": self.config.supervisor_model,
+            "model": self.config.officer_model,
             "max_tokens": 300,
             "system": SYSTEM_PROMPT,
             "messages": [
@@ -114,7 +114,7 @@ class APIDecisionJudge(Judge):
             "https://api.anthropic.com/v1/messages",
             data=json.dumps(body).encode("utf-8"),
             headers={
-                "x-api-key": f"{self.config.supervisor_api_key}",
+                "x-api-key": f"{self.config.officer_api_key}",
                 "anthropic-version": "2023-06-01",
                 "content-type": "application/json",
             },
