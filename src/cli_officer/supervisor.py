@@ -62,7 +62,6 @@ class Supervisor:
             return
         timestamp = time.strftime("%H:%M:%S")
         if result.interrupt is None or result.decision is None:
-            print(f"[{timestamp}] observe waiting-for-interrupt", flush=True)
             return
         prompt = result.interrupt.prompt_line.replace("\n", " ").strip()
         reply = result.reply_sent or result.decision.reply or "-"
