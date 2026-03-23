@@ -9,7 +9,7 @@ import unittest
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
 
 from cli_officer.config import ProviderConfig, load_config, save_config
-from cli_officer.launcher import bootstrap_workspace, resolve_worker_command
+from cli_officer.launcher import bootstrap_workspace, build_officer_command, resolve_worker_command
 from cli_officer.llm import HeuristicJudge
 from cli_officer.models import Decision, DecisionMode, Interrupt
 from cli_officer.policy import enforce_thresholds, evaluate_guard
@@ -21,7 +21,7 @@ class FakeTmuxClient:
         self.panes = panes
         self.sent: list[tuple[str, str]] = []
         self.created: list[tuple[str, str, str]] = []
-        self.splits: list[tuple[str, str]] = []
+        self.splits: list[tuple[str, str, str | None]] = []
         self.layouts: list[tuple[str, str]] = []
         self.selected_panes: list[str] = []
         self.attached: list[str] = []
@@ -36,8 +36,8 @@ class FakeTmuxClient:
         self.created.append((session_name, workdir, command))
         return "%10"
 
-    def split_window(self, target: str, workdir: str) -> str:
-        self.splits.append((target, workdir))
+    def split_window(self, target: str, workdir: str, command: str | None = None) -> str:
+        self.splits.append((target, workdir, command))
         return "%11"
 
     def select_layout(self, target: str, layout: str) -> None:
@@ -91,15 +91,30 @@ class SupervisorTests(unittest.TestCase):
             coding_agent="codex",
         )
 
-        result = bootstrap_workspace(client, config, session_name="cli-officer", workdir="/tmp/project")
+        result = bootstrap_workspace(
+            client,
+            config,
+            session_name="cli-officer",
+            workdir="/tmp/project",
+            interval=1.0,
+            dry_run=False,
+        )
+        
 
         self.assertEqual(result.worker_command, "codex")
         self.assertEqual(result.worker_pane, "%10")
         self.assertEqual(result.officer_pane, "%11")
         self.assertEqual(client.created, [("cli-officer", "/tmp/project", "codex")])
-        self.assertEqual(client.splits, [("%10", "/tmp/project")])
+        self.assertEqual(client.splits, [("%10", "/tmp/project", build_officer_command("%10", 1.0, False))])
         self.assertEqual(client.layouts, [("%10", "even-horizontal")])
         self.assertEqual(client.selected_panes, ["%10"])
+
+    def test_build_officer_command_targets_worker_pane(self) -> None:
+        command = build_officer_command(worker_pane="%10", interval=1.0, dry_run=True)
+
+        self.assertIn("--target %10", command)
+        self.assertIn("--interval 1.0", command)
+        self.assertIn("--dry-run", command)
 
     def test_resolve_worker_command_for_claude(self) -> None:
         config = ProviderConfig(

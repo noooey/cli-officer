@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import shlex
+import sys
 
 from .config import ProviderConfig
 
@@ -25,10 +27,25 @@ def resolve_worker_command(config: ProviderConfig) -> str:
         raise ValueError(f"Unsupported coding agent: {config.coding_agent}") from exc
 
 
-def bootstrap_workspace(tmux_client: object, config: ProviderConfig, session_name: str, workdir: str) -> BootstrapResult:
+def build_officer_command(worker_pane: str, interval: float, dry_run: bool) -> str:
+    command = [sys.executable, "-m", "cli_officer", "--target", worker_pane, "--interval", str(interval)]
+    if dry_run:
+        command.append("--dry-run")
+    return shlex.join(command)
+
+
+def bootstrap_workspace(
+    tmux_client: object,
+    config: ProviderConfig,
+    session_name: str,
+    workdir: str,
+    interval: float,
+    dry_run: bool,
+) -> BootstrapResult:
     worker_command = resolve_worker_command(config)
     worker_pane = tmux_client.create_session(session_name=session_name, workdir=workdir, command=worker_command)
-    officer_pane = tmux_client.split_window(target=worker_pane, workdir=workdir)
+    officer_command = build_officer_command(worker_pane=worker_pane, interval=interval, dry_run=dry_run)
+    officer_pane = tmux_client.split_window(target=worker_pane, workdir=workdir, command=officer_command)
     tmux_client.select_layout(target=worker_pane, layout="even-horizontal")
     tmux_client.select_pane(target=worker_pane)
     return BootstrapResult(

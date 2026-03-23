@@ -53,8 +53,9 @@ def main() -> int:
                 config=config,
                 session_name=args.session_name,
                 workdir=args.workdir,
+                interval=args.interval,
+                dry_run=args.dry_run,
             )
-            target = bootstrapped.worker_pane
             print(
                 json.dumps(
                     {
@@ -68,7 +69,7 @@ def main() -> int:
             )
             if args.attach:
                 tmux_client.attach_session(bootstrapped.session_name)
-                return 0
+            return 0
         if not target:
             print("--target is required unless --launch is used.", file=sys.stderr)
             return 2

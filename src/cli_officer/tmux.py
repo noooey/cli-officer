@@ -18,38 +18,39 @@ class TmuxClient:
             raise TmuxError(completed.stderr.strip() or "tmux command failed")
         return completed.stdout.strip()
 
-    def create_session(self, session_name: str, workdir: str, command: str) -> str:
-        return self._run(
-            [
-                self.binary,
-                "new-session",
-                "-d",
-                "-P",
-                "-F",
-                "#{pane_id}",
-                "-s",
-                session_name,
-                "-c",
-                workdir,
-                command,
-            ]
-        )
+    def create_session(self, session_name: str, workdir: str, command: str | None = None) -> str:
+        tmux_command = [
+            self.binary,
+            "new-session",
+            "-d",
+            "-P",
+            "-F",
+            "#{pane_id}",
+            "-s",
+            session_name,
+            "-c",
+            workdir,
+        ]
+        if command:
+            tmux_command.append(command)
+        return self._run(tmux_command)
 
-    def split_window(self, target: str, workdir: str) -> str:
-        return self._run(
-            [
-                self.binary,
-                "split-window",
-                "-P",
-                "-F",
-                "#{pane_id}",
-                "-t",
-                target,
-                "-h",
-                "-c",
-                workdir,
-            ]
-        )
+    def split_window(self, target: str, workdir: str, command: str | None = None) -> str:
+        tmux_command = [
+            self.binary,
+            "split-window",
+            "-P",
+            "-F",
+            "#{pane_id}",
+            "-t",
+            target,
+            "-h",
+            "-c",
+            workdir,
+        ]
+        if command:
+            tmux_command.append(command)
+        return self._run(tmux_command)
 
     def select_layout(self, target: str, layout: str) -> None:
         self._run([self.binary, "select-layout", "-t", target, layout])
