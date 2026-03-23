@@ -76,14 +76,14 @@ class APIDecisionJudge(Judge):
         try:
             payload = self._call_api(interrupt)
             return self._parse_decision(payload)
-        except (OSError, ValueError, KeyError, error.URLError, error.HTTPError, json.JSONDecodeError):
+        except (OSError, ValueError, KeyError, error.URLError, error.HTTPError, json.JSONDecodeError) as exc:
             return Decision(
                 interrupt_detected=True,
                 risk_level="unknown",
                 mode=DecisionMode.SUGGEST,
                 reply="",
                 confidence=0.0,
-                rationale="LLM API unavailable",
+                rationale=f"LLM API unavailable: {exc}",
             )
 
     def _call_api(self, interrupt: Interrupt) -> dict:
@@ -118,9 +118,9 @@ class APIDecisionJudge(Judge):
         )
         with request.urlopen(req, timeout=30) as response:
             payload = json.loads(response.read().decode("utf-8"))
-        text = payload.get("output_text", "").strip()
+        text = _extract_openai_output_text(payload)
         if not text:
-            raise ValueError("OpenAI response missing output_text")
+            raise ValueError(f"OpenAI response missing output_text: {json.dumps(payload)[:500]}")
         return json.loads(text)
 
     def _call_anthropic(self, interrupt: Interrupt) -> dict:
@@ -147,7 +147,7 @@ class APIDecisionJudge(Judge):
         parts = payload.get("content", [])
         text = "".join(part.get("text", "") for part in parts if part.get("type") == "text").strip()
         if not text:
-            raise ValueError("Anthropic response missing text content")
+            raise ValueError(f"Anthropic response missing text content: {json.dumps(payload)[:500]}")
         return json.loads(text)
 
     @staticmethod
@@ -242,3 +242,16 @@ def _format_http_error(provider: str, exc: error.HTTPError) -> str:
         body = body[:300]
         return f"{provider} validation failed with status {exc.code}: {body}"
     return f"{provider} validation failed with status {exc.code}"
+
+
+def _extract_openai_output_text(payload: dict) -> str:
+    output_text = str(payload.get("output_text", "")).strip()
+    if output_text:
+        return output_text
+    for item in payload.get("output", []):
+        for content in item.get("content", []):
+            if content.get("type") == "output_text":
+                text = str(content.get("text", "")).strip()
+                if text:
+                    return text
+    return ""
