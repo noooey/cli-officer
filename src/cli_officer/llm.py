@@ -21,6 +21,8 @@ class HeuristicJudge(Judge):
         prompt = interrupt.prompt_line.lower()
         if interrupt.kind == "confirm":
             return Decision(True, "low", DecisionMode.AUTO, "yes", 0.92, "Standard confirmation")
+        if interrupt.kind == "approval":
+            return Decision(True, "low", DecisionMode.AUTO, "yes", 0.86, "Natural-language approval prompt")
         if interrupt.kind == "retry":
             return Decision(True, "low", DecisionMode.AUTO, "retry", 0.88, "Retry prompt")
         if interrupt.kind == "path":

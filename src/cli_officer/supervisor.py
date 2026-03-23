@@ -18,22 +18,36 @@ class Supervisor:
     dry_run: bool = False
     allow_hard_actions: bool = False
     log_events: bool = True
+    stall_seconds: float = 2.0
+    now: object = time.monotonic
     history: list[str] = field(default_factory=list)
+    last_change_at: float = field(default_factory=time.monotonic)
+    last_handled_signature: str = ""
 
     def poll_once(self) -> SupervisorResult:
         lines = self.tmux_client.capture_pane(self.target)
-        if lines == self.history:
+        current_time = self.now()
+        if lines != self.history:
+            self.history = list(lines)
+            self.last_change_at = current_time
+            return self._evaluate_lines(lines)
+        if current_time - self.last_change_at < self.stall_seconds:
             return SupervisorResult(None, None, "noop")
-        self.history = list(lines)
+        return self._evaluate_lines(lines)
 
+    def _evaluate_lines(self, lines: list[str]) -> SupervisorResult:
         interrupt = detect_interrupt(lines)
         if not interrupt:
             result = SupervisorResult(None, None, "observe")
             self._log_result(result)
             return result
+        signature = self._interrupt_signature(interrupt)
+        if signature == self.last_handled_signature:
+            return SupervisorResult(None, None, "noop")
 
         guarded = None if self.allow_hard_actions else evaluate_guard(interrupt)
         if guarded:
+            self.last_handled_signature = signature
             result = SupervisorResult(interrupt, guarded, "blocked-by-policy")
             self._log_result(result)
             return result
@@ -42,13 +56,16 @@ class Supervisor:
         if decision.mode == DecisionMode.AUTO and decision.reply:
             if not self.dry_run:
                 self.tmux_client.send_keys(self.target, decision.reply)
+            self.last_handled_signature = signature
             result = SupervisorResult(interrupt, decision, "auto-replied", reply_sent=decision.reply)
             self._log_result(result)
             return result
         if decision.mode == DecisionMode.SUGGEST:
+            self.last_handled_signature = signature
             result = SupervisorResult(interrupt, decision, "suggested")
             self._log_result(result)
             return result
+        self.last_handled_signature = signature
         result = SupervisorResult(interrupt, decision, "blocked")
         self._log_result(result)
         return result
@@ -75,3 +92,7 @@ class Supervisor:
             file=sys.stdout,
             flush=True,
         )
+
+    @staticmethod
+    def _interrupt_signature(interrupt: object) -> str:
+        return f"{interrupt.kind}|{interrupt.prompt_line}|{interrupt.prompt}"

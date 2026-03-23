@@ -9,6 +9,13 @@ PROMPT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("retry", re.compile(r"\b(?:retry|try again|rerun)\b", re.IGNORECASE)),
     ("path", re.compile(r"\b(?:enter|provide|input).*(?:path|directory|file)\b", re.IGNORECASE)),
     ("choice", re.compile(r"\b(?:select|choose|pick|option)\b", re.IGNORECASE)),
+    (
+        "approval",
+        re.compile(
+            r"(?:\bif you want\b|\bwould you like me to\b|\bshall i\b|\bi can\b.*\bfor you\b|\bwant me to\b|원하면|바로 .*해드리겠습니다|바꿔드리겠습니다|진행할까요)",
+            re.IGNORECASE,
+        ),
+    ),
 )
 
 

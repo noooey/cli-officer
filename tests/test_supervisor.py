@@ -167,6 +167,36 @@ class SupervisorTests(unittest.TestCase):
         self.assertEqual(client.sent, [])
         self.assertEqual(result.decision.mode, DecisionMode.SUGGEST)
 
+    def test_natural_language_approval_auto_replies(self) -> None:
+        client = FakeTmuxClient(
+            [[
+                "Pragmatically, this is ready.",
+                "원하면 다음 턴에 이걸 바로 QA 체크리스트 형태로 바꿔드리겠습니다.",
+            ]]
+        )
+        supervisor = Supervisor(client, HeuristicJudge(), "%1", dry_run=False)
+
+        result = supervisor.poll_once()
+
+        self.assertEqual(result.action_taken, "auto-replied")
+        self.assertEqual(result.reply_sent, "yes")
+        self.assertEqual(client.sent, [("%1", "yes")])
+
+    def test_stalled_worker_retries_interrupt_detection(self) -> None:
+        times = iter([0.0, 3.0])
+        client = FakeTmuxClient([
+            ["Would you like me to continue with the checklist?"],
+            ["Would you like me to continue with the checklist?"],
+        ])
+        supervisor = Supervisor(client, HeuristicJudge(), "%1", dry_run=False, now=lambda: next(times), stall_seconds=2.0)
+
+        first = supervisor.poll_once()
+        second = supervisor.poll_once()
+
+        self.assertEqual(first.action_taken, "auto-replied")
+        self.assertEqual(second.action_taken, "noop")
+        self.assertEqual(client.sent, [("%1", "yes")])
+
     def test_guard_detects_git_push(self) -> None:
         interrupt = Interrupt(
             prompt="git push origin main\nProceed? [y/n]",
