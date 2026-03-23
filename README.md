@@ -33,7 +33,7 @@ Reply constraints:
 - no explanation
 - terminal-compatible only
 
-## Run
+## Install
 
 Install `tmux` first. Python packaging files do not install system binaries.
 
@@ -49,6 +49,22 @@ Or manually:
 sudo apt-get update && sudo apt-get install -y tmux
 brew install tmux
 ```
+
+Install the CLI once from this repository:
+
+```bash
+./scripts/install_cli_officer.sh
+```
+
+Or manually:
+
+```bash
+python3 -m pip install -e /path/to/cli-officer
+```
+
+After that, you can run `cli-officer` from any repository.
+
+## First Run
 
 On the first run, `cli-officer` asks you to configure two things:
 
@@ -69,28 +85,36 @@ Then it asks for the selected supervisor provider API key.
 
 The config is stored at `~/.config/cli-officer/config.json` with file mode `600`.
 
+You can initialize the config explicitly:
+
+```bash
+cli-officer --init
+```
+
+## Run
+
+From the repository you actually want to work on:
+
+```bash
+cd /path/to/your-project
+```
+
 To attach to an existing worker pane:
 
 ```bash
-python3 -m cli_officer --target %1 --once --dry-run
-```
-
-You can also initialize config explicitly:
-
-```bash
-python3 -m cli_officer --init
+cli-officer --target %1 --once --dry-run
 ```
 
 To let `cli-officer` create the 2-pane tmux session and launch the selected coding agent itself:
 
 ```bash
-python3 -m cli_officer --launch --session-name cli-officer --workdir .
+cli-officer --launch --attach --session-name cli-officer
 ```
 
 To launch and immediately attach to the created session:
 
 ```bash
-python3 -m cli_officer --launch --attach --session-name cli-officer --workdir .
+cli-officer --launch --attach --session-name cli-officer --workdir /path/to/your-project
 ```
 
 If you do not use `--attach`, the launch output includes an `attach_command` field you can run manually.
@@ -98,7 +122,7 @@ If you do not use `--attach`, the launch output includes an `attach_command` fie
 For a continuous loop against an existing worker pane:
 
 ```bash
-python3 -m cli_officer --target %1 --interval 1.0
+cli-officer --target %1 --interval 1.0
 ```
 
 ## Notes
