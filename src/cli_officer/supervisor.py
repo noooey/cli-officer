@@ -60,7 +60,12 @@ class Supervisor:
             self._log_result(result)
             return result
 
-        active_judge = HeuristicJudge() if self.allow_hard_actions else self.judge
+        heuristic_kinds = {"confirm", "approval", "retry"}
+        active_judge = (
+            HeuristicJudge()
+            if self.allow_hard_actions or interrupt.kind in heuristic_kinds
+            else self.judge
+        )
         decision = enforce_thresholds(active_judge.decide(interrupt))
         if not decision.needs_reply or not decision.interrupt_detected:
             self.last_handled_signature = signature
