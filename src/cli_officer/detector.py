@@ -19,8 +19,9 @@ QUESTION_PATTERN = re.compile(r"\?")
 KOREAN_OFFER_ENDING = re.compile(r"(?:드릴게요|드리겠습니다|하겠습니다|해드리겠습니다|진행할까요)$")
 
 
-def detect_interrupt(lines: list[str], context_window: int = 8) -> Interrupt | None:
-    for index in range(len(lines) - 1, -1, -1):
+def detect_interrupt(lines: list[str], context_window: int = 8, scan_depth: int = 40) -> Interrupt | None:
+    scan_start = max(0, len(lines) - scan_depth)
+    for index in range(len(lines) - 1, scan_start - 1, -1):
         line = lines[index].strip()
         if not line:
             continue
@@ -84,7 +85,7 @@ def detect_interrupt(lines: list[str], context_window: int = 8) -> Interrupt | N
                 context=lines[start : index + 1],
                 kind="question",
             )
-    return _detect_from_recent_context(lines, context_window=context_window)
+    return _detect_from_recent_context(lines[-scan_depth:], context_window=context_window)
 
 
 def _detect_from_recent_context(lines: list[str], context_window: int = 8) -> Interrupt | None:
@@ -112,7 +113,8 @@ def _detect_from_recent_context(lines: list[str], context_window: int = 8) -> In
     return None
 
 
-def extract_stalled_candidate(lines: list[str], context_window: int = 12) -> Interrupt | None:
+def extract_stalled_candidate(lines: list[str], context_window: int = 12, scan_depth: int = 40) -> Interrupt | None:
+    lines = lines[-scan_depth:]
     non_empty_indexes = [index for index, line in enumerate(lines) if line.strip()]
     if not non_empty_indexes:
         return None
