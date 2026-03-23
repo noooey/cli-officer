@@ -52,6 +52,20 @@ Rules:
 - prefer suggest or block if uncertain
 """
 
+OPENAI_DECISION_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "interrupt_detected": {"type": "boolean"},
+        "risk_level": {"type": "string"},
+        "mode": {"type": "string", "enum": ["auto", "suggest", "block"]},
+        "reply": {"type": "string"},
+        "confidence": {"type": "number"},
+        "rationale": {"type": "string"},
+    },
+    "required": ["interrupt_detected", "risk_level", "mode", "reply", "confidence", "rationale"],
+}
+
 
 @dataclass(slots=True)
 class APIDecisionJudge(Judge):
@@ -82,10 +96,16 @@ class APIDecisionJudge(Judge):
     def _call_openai(self, interrupt: Interrupt) -> dict:
         body = {
             "model": self.config.officer_model,
-            "input": [
-                {"role": "system", "content": [{"type": "input_text", "text": SYSTEM_PROMPT}]},
-                {"role": "user", "content": [{"type": "input_text", "text": self._build_user_prompt(interrupt)}]},
-            ],
+            "instructions": SYSTEM_PROMPT,
+            "input": self._build_user_prompt(interrupt),
+            "text": {
+                "format": {
+                    "type": "json_schema",
+                    "name": "officer_decision",
+                    "strict": True,
+                    "schema": OPENAI_DECISION_SCHEMA,
+                }
+            },
         }
         req = request.Request(
             "https://api.openai.com/v1/responses",
