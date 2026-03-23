@@ -209,6 +209,23 @@ class SupervisorTests(unittest.TestCase):
         self.assertEqual(result.reply_sent, "yes")
         self.assertEqual(client.sent, [("%1", "yes")])
 
+    def test_trailing_input_composer_does_not_hide_approval_prompt(self) -> None:
+        client = FakeTmuxClient(
+            [[
+                "원하면 다음 단계로 바로 이어서 E2E 테스트 시나리오 목록이나",
+                "Playwright 기준 테스트 케이스 표 형태로 정리해드리겠습니다.",
+                "",
+                "› Summarize recent commits",
+            ]]
+        )
+        supervisor = Supervisor(client, HeuristicJudge(), "%1", dry_run=False)
+
+        result = supervisor.poll_once()
+
+        self.assertEqual(result.action_taken, "auto-replied")
+        self.assertEqual(result.reply_sent, "yes")
+        self.assertEqual(client.sent, [("%1", "yes")])
+
     def test_bulleted_choice_picks_first_option(self) -> None:
         client = FakeTmuxClient(
             [[

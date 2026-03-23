@@ -29,6 +29,7 @@ class Supervisor:
     def poll_once(self) -> SupervisorResult:
         lines = self.tmux_client.capture_pane(self.target)
         lines = self._strip_recent_sent_echoes(lines)
+        lines = self._strip_trailing_input_buffer(lines)
         current_time = self.now()
         if lines != self.history:
             self.history = list(lines)
@@ -130,6 +131,21 @@ class Supervisor:
                 continue
             normalized = " ".join(candidate.split())
             if normalized in self.recent_sent_replies:
+                trimmed.pop()
+                continue
+            break
+        return trimmed
+
+    @staticmethod
+    def _strip_trailing_input_buffer(lines: list[str]) -> list[str]:
+        trimmed = list(lines)
+        while trimmed:
+            candidate = trimmed[-1].rstrip()
+            stripped = candidate.strip()
+            if not stripped:
+                trimmed.pop()
+                continue
+            if stripped.startswith("› ") or stripped.startswith("> "):
                 trimmed.pop()
                 continue
             break
