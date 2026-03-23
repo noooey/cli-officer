@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import curses
 import json
 import os
 import sys
 from dataclasses import asdict, dataclass
 from getpass import getpass
 from pathlib import Path
+import termios
+import tty
 
 DEFAULT_MODELS: dict[str, str] = {
     "openai": "gpt-5-mini",
@@ -137,7 +138,7 @@ def prompt_valid_api_key(provider: str, model: str) -> str:
 def choose_from_menu(title: str, choices: dict[str, str], labels: dict[str, str], prompt: str) -> str:
     ordered_keys = [key for key in ("1", "2", "3") if key in labels]
     if sys.stdin.isatty() and sys.stdout.isatty() and os.environ.get("TERM"):
-        return _choose_with_curses(title=title, choices=choices, labels=labels, ordered_keys=ordered_keys)
+        return _choose_with_inline_menu(title=title, choices=choices, labels=labels, ordered_keys=ordered_keys)
     return _choose_with_text_prompt(title=title, choices=choices, labels=labels, ordered_keys=ordered_keys, prompt=prompt)
 
 
@@ -158,28 +159,40 @@ def _choose_with_text_prompt(
         print("Invalid selection. Choose one of the listed numbers.", file=sys.stderr)
 
 
-def _choose_with_curses(title: str, choices: dict[str, str], labels: dict[str, str], ordered_keys: list[str]) -> str:
+def _choose_with_inline_menu(title: str, choices: dict[str, str], labels: dict[str, str], ordered_keys: list[str]) -> str:
     options = [(key, labels[key], choices[key]) for key in ordered_keys]
-
-    def run_menu(stdscr: curses.window) -> str:
-        curses.curs_set(0)
-        stdscr.keypad(True)
-        selected = 0
+    selected = 0
+    printed_lines = 0
+    fd = sys.stdin.fileno()
+    previous = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
         while True:
-            stdscr.erase()
-            stdscr.addstr(0, 0, title)
-            stdscr.addstr(1, 0, "Use Up/Down and Enter.")
+            if printed_lines:
+                sys.stdout.write(f"\x1b[{printed_lines}F")
+            lines = [title, "Use Up/Down and Enter."]
             for index, (_, label, value) in enumerate(options):
                 prefix = "> " if index == selected else "  "
-                stdscr.addstr(index + 3, 0, f"{prefix}{label}")
-            stdscr.refresh()
+                lines.append(f"{prefix}{label}")
+            sys.stdout.write("\n".join(lines) + "\n")
+            sys.stdout.flush()
+            printed_lines = len(lines)
 
-            key = stdscr.getch()
-            if key in (curses.KEY_UP, ord("k")):
+            key = sys.stdin.read(1)
+            if key == "\x1b":
+                sequence = key + sys.stdin.read(2)
+                if sequence == "\x1b[A":
+                    selected = (selected - 1) % len(options)
+                elif sequence == "\x1b[B":
+                    selected = (selected + 1) % len(options)
+            elif key in ("k",):
                 selected = (selected - 1) % len(options)
-            elif key in (curses.KEY_DOWN, ord("j")):
+            elif key in ("j",):
                 selected = (selected + 1) % len(options)
-            elif key in (curses.KEY_ENTER, 10, 13):
+            elif key in ("\r", "\n"):
+                sys.stdout.write(f"\x1b[{printed_lines}F")
+                sys.stdout.write("\x1b[J")
+                sys.stdout.flush()
                 return options[selected][2]
-
-    return curses.wrapper(run_menu)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, previous)

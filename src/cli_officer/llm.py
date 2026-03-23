@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
-from urllib import error, request
+from urllib import error, parse, request
 
 from .config import ProviderConfig
 from .models import Decision, DecisionMode, Interrupt
@@ -171,23 +171,20 @@ def validate_provider_config(config: ProviderConfig) -> None:
 
 
 def _validate_openai(config: ProviderConfig) -> None:
-    body = {
-        "model": config.officer_model,
-        "input": "Reply with OK.",
-        "max_output_tokens": 8,
-    }
     req = request.Request(
-        "https://api.openai.com/v1/responses",
-        data=json.dumps(body).encode("utf-8"),
+        f"https://api.openai.com/v1/models/{parse.quote(config.officer_model, safe='')}",
         headers={
             "Authorization": f"Bearer {config.officer_api_key}",
             "Content-Type": "application/json",
         },
-        method="POST",
+        method="GET",
     )
-    with request.urlopen(req, timeout=30) as response:
-        if response.status >= 400:
-            raise ValueError(f"OpenAI validation failed with status {response.status}")
+    try:
+        with request.urlopen(req, timeout=30) as response:
+            if response.status >= 400:
+                raise ValueError(f"OpenAI validation failed with status {response.status}")
+    except error.HTTPError as exc:
+        raise ValueError(_format_http_error("OpenAI", exc)) from exc
 
 
 def _validate_anthropic(config: ProviderConfig) -> None:
@@ -206,6 +203,20 @@ def _validate_anthropic(config: ProviderConfig) -> None:
         },
         method="POST",
     )
-    with request.urlopen(req, timeout=30) as response:
-        if response.status >= 400:
-            raise ValueError(f"Anthropic validation failed with status {response.status}")
+    try:
+        with request.urlopen(req, timeout=30) as response:
+            if response.status >= 400:
+                raise ValueError(f"Anthropic validation failed with status {response.status}")
+    except error.HTTPError as exc:
+        raise ValueError(_format_http_error("Anthropic", exc)) from exc
+
+
+def _format_http_error(provider: str, exc: error.HTTPError) -> str:
+    try:
+        body = exc.read().decode("utf-8", errors="replace").strip()
+    except Exception:
+        body = ""
+    if body:
+        body = body[:300]
+        return f"{provider} validation failed with status {exc.code}: {body}"
+    return f"{provider} validation failed with status {exc.code}"
