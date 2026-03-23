@@ -30,6 +30,7 @@ def bootstrap_workspace(tmux_client: object, config: ProviderConfig, session_nam
     worker_pane = tmux_client.create_session(session_name=session_name, workdir=workdir, command=worker_command)
     officer_pane = tmux_client.split_window(target=worker_pane, workdir=workdir)
     tmux_client.select_layout(target=worker_pane, layout="even-horizontal")
+    tmux_client.select_pane(target=worker_pane)
     return BootstrapResult(
         session_name=session_name,
         worker_pane=worker_pane,

@@ -23,6 +23,7 @@ class FakeTmuxClient:
         self.created: list[tuple[str, str, str]] = []
         self.splits: list[tuple[str, str]] = []
         self.layouts: list[tuple[str, str]] = []
+        self.selected_panes: list[str] = []
         self.attached: list[str] = []
 
     def capture_pane(self, target: str, lines: int = 200) -> list[str]:
@@ -41,6 +42,9 @@ class FakeTmuxClient:
 
     def select_layout(self, target: str, layout: str) -> None:
         self.layouts.append((target, layout))
+
+    def select_pane(self, target: str) -> None:
+        self.selected_panes.append(target)
 
     def attach_session(self, session_name: str) -> None:
         self.attached.append(session_name)
@@ -95,6 +99,7 @@ class SupervisorTests(unittest.TestCase):
         self.assertEqual(client.created, [("cli-officer", "/tmp/project", "codex")])
         self.assertEqual(client.splits, [("%10", "/tmp/project")])
         self.assertEqual(client.layouts, [("%10", "even-horizontal")])
+        self.assertEqual(client.selected_panes, ["%10"])
 
     def test_resolve_worker_command_for_claude(self) -> None:
         config = ProviderConfig(

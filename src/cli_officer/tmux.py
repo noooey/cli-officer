@@ -54,6 +54,9 @@ class TmuxClient:
     def select_layout(self, target: str, layout: str) -> None:
         self._run([self.binary, "select-layout", "-t", target, layout])
 
+    def select_pane(self, target: str) -> None:
+        self._run([self.binary, "select-pane", "-t", target])
+
     def attach_session(self, session_name: str) -> None:
         self._run([self.binary, "attach-session", "-t", session_name])
 
