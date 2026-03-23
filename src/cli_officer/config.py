@@ -178,8 +178,8 @@ def _choose_with_inline_menu(title: str, choices: dict[str, str], labels: dict[s
         if not first_render:
             sys.stdout.write(f"\x1b[{menu_height}F")
         sys.stdout.write("\r\x1b[J")
-        sys.stdout.write("\n".join(lines))
-        sys.stdout.write("\n")
+        sys.stdout.write("\r\n".join(lines))
+        sys.stdout.write("\r\n")
         sys.stdout.flush()
 
     try:
