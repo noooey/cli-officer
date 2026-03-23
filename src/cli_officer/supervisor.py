@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 from .detector import detect_interrupt, extract_stalled_candidate
 from .llm import Judge
-from .models import Decision, DecisionMode, SupervisorResult
+from .models import SupervisorResult
 from .policy import enforce_thresholds, evaluate_guard
 
 
@@ -55,31 +55,22 @@ class Supervisor:
         guarded = None if self.allow_hard_actions else evaluate_guard(interrupt)
         if guarded:
             self.last_handled_signature = signature
-            result = SupervisorResult(interrupt, guarded, "blocked-by-policy")
+            result = SupervisorResult(interrupt, guarded, "suggested")
             self._log_result(result)
             return result
 
         decision = enforce_thresholds(self.judge.decide(interrupt))
-        if self.allow_hard_actions:
-            decision = self._apply_hard_override(decision)
         if not decision.needs_reply or not decision.interrupt_detected:
             self.last_handled_signature = signature
             return SupervisorResult(None, None, "noop")
-        if decision.mode == DecisionMode.AUTO and decision.reply:
-            if not self.dry_run:
-                self.tmux_client.send_keys(self.target, decision.reply)
-                self._remember_sent_reply(decision.reply)
+        if not decision.reply:
             self.last_handled_signature = signature
-            result = SupervisorResult(interrupt, decision, "auto-replied", reply_sent=decision.reply)
-            self._log_result(result)
-            return result
-        if decision.mode == DecisionMode.SUGGEST:
-            self.last_handled_signature = signature
-            result = SupervisorResult(interrupt, decision, "suggested")
-            self._log_result(result)
-            return result
+            return SupervisorResult(None, None, "noop")
+        if not self.dry_run:
+            self.tmux_client.send_keys(self.target, decision.reply)
+            self._remember_sent_reply(decision.reply)
         self.last_handled_signature = signature
-        result = SupervisorResult(interrupt, decision, "blocked")
+        result = SupervisorResult(interrupt, decision, "auto-replied", reply_sent=decision.reply)
         self._log_result(result)
         return result
 
@@ -101,7 +92,7 @@ class Supervisor:
         if result.action_taken == "auto-replied":
             reply_field = "sent"
             reply_value = result.reply_sent or "-"
-        elif result.action_taken in {"suggested", "blocked", "blocked-by-policy"}:
+        elif result.action_taken == "suggested":
             reply_field = "candidate"
         print(
             f"[{timestamp}] {result.action_taken} kind={result.interrupt.kind} "
@@ -155,23 +146,3 @@ class Supervisor:
             break
         return trimmed
 
-    @staticmethod
-    def _apply_hard_override(decision: Decision) -> Decision:
-        if not decision.reply or not decision.needs_reply or not decision.interrupt_detected:
-            return decision
-        if decision.mode == DecisionMode.AUTO:
-            return decision
-        rationale = decision.rationale
-        if rationale:
-            rationale = f"{rationale}; hard override auto-approved"
-        else:
-            rationale = "Hard override auto-approved"
-        return Decision(
-            interrupt_detected=decision.interrupt_detected,
-            risk_level=decision.risk_level,
-            mode=DecisionMode.AUTO,
-            reply=decision.reply,
-            confidence=decision.confidence,
-            rationale=rationale,
-            needs_reply=decision.needs_reply,
-        )

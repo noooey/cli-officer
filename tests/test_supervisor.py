@@ -162,9 +162,8 @@ class SupervisorTests(unittest.TestCase):
 
         result = supervisor.poll_once()
 
-        self.assertEqual(result.action_taken, "blocked-by-policy")
+        self.assertEqual(result.action_taken, "suggested")
         self.assertEqual(client.sent, [])
-        self.assertEqual(result.decision.mode, DecisionMode.BLOCK)
 
     def test_low_confidence_downgrades_to_suggest(self) -> None:
         client = FakeTmuxClient([["Operation failed", "Retry? [y/n]"]])
@@ -365,16 +364,7 @@ class SupervisorTests(unittest.TestCase):
 
         result = supervisor.poll_once()
 
-        self.assertNotEqual(result.action_taken, "blocked-by-policy")
-
-    def test_hard_mode_auto_approves_suggested_reply(self) -> None:
-        client = FakeTmuxClient([["Operation failed", "Retry? [y/n]"]])
-        supervisor = Supervisor(client, LowConfidenceJudge(), "%1", dry_run=False, allow_hard_actions=True)
-
-        result = supervisor.poll_once()
-
         self.assertEqual(result.action_taken, "auto-replied")
-        self.assertEqual(result.reply_sent, "yes")
         self.assertEqual(client.sent, [("%1", "yes")])
 
     def test_reply_is_normalized_to_single_line(self) -> None:
