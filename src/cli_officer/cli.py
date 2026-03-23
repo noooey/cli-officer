@@ -30,8 +30,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_parser().parse_args()
-    config = ensure_config()
     if args.init:
+        config = ensure_config(force_reconfigure=True)
         print(
             json.dumps(
                 {
@@ -42,6 +42,7 @@ def main() -> int:
             )
         )
         return 0
+    config = ensure_config()
     if shutil.which("tmux") is None:
         print("tmux is required but was not found in PATH. See README.md for installation.", file=sys.stderr)
         return 2

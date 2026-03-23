@@ -53,10 +53,11 @@ def save_config(config: ProviderConfig) -> None:
     os.chmod(path, 0o600)
 
 
-def ensure_config() -> ProviderConfig:
-    existing = load_config()
-    if existing:
-        return existing
+def ensure_config(force_reconfigure: bool = False) -> ProviderConfig:
+    if not force_reconfigure:
+        existing = load_config()
+        if existing:
+            return existing
     config = run_first_time_setup()
     save_config(config)
     return config
