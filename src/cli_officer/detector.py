@@ -49,6 +49,14 @@ def detect_interrupt(lines: list[str], context_window: int = 8) -> Interrupt | N
                 context=lines[start : index + 1],
                 kind="approval",
             )
+        if re.match(r"^[›>]\s+\d+[.)]\s+", line):
+            start = max(0, index - context_window)
+            return Interrupt(
+                prompt="\n".join(lines[start : index + 1]),
+                prompt_line=line,
+                context=lines[start : index + 1],
+                kind="confirm",
+            )
         if _looks_like_bulleted_choice(lines, index):
             start = max(0, index - context_window)
             return Interrupt(
@@ -57,7 +65,8 @@ def detect_interrupt(lines: list[str], context_window: int = 8) -> Interrupt | N
                 context=lines[start : index + 1],
                 kind="choice",
             )
-        if line.endswith("?") and len(line) < 200:
+        line_no_border = re.sub(r"[\s│|]+$", "", line)
+        if line_no_border.endswith("?") and len(line) < 200:
             start = max(0, index - context_window)
             return Interrupt(
                 prompt="\n".join(lines[start : index + 1]),

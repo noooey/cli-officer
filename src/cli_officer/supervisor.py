@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import re
 import sys
 import time
 from collections import deque
 from dataclasses import dataclass, field
 
 from .detector import detect_interrupt, extract_stalled_candidate
-from .llm import Judge
+from .llm import HeuristicJudge, Judge
 from .models import SupervisorResult
 from .policy import enforce_thresholds, evaluate_guard
 
@@ -59,7 +60,8 @@ class Supervisor:
             self._log_result(result)
             return result
 
-        decision = enforce_thresholds(self.judge.decide(interrupt))
+        active_judge = HeuristicJudge() if self.allow_hard_actions else self.judge
+        decision = enforce_thresholds(active_judge.decide(interrupt))
         if not decision.needs_reply or not decision.interrupt_detected:
             self.last_handled_signature = signature
             return SupervisorResult(None, None, "noop")
@@ -138,6 +140,9 @@ class Supervisor:
                 trimmed.pop()
                 continue
             if stripped.startswith("› ") or stripped.startswith("> "):
+                rest = stripped[2:].lstrip()
+                if re.match(r"\d+[.)]\s", rest):
+                    break  # numbered menu option, not an input hint
                 trimmed.pop()
                 continue
             if stripped in {"│", "|"}:
