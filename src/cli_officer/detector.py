@@ -4,19 +4,19 @@ import re
 
 from .models import Interrupt
 
-PROMPT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+LINE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("confirm", re.compile(r"\b(?:y/n|yes/no|continue\?|proceed\?|confirm)\b", re.IGNORECASE)),
     ("retry", re.compile(r"\b(?:retry|try again|rerun)\b", re.IGNORECASE)),
     ("path", re.compile(r"\b(?:enter|provide|input).*(?:path|directory|file)\b", re.IGNORECASE)),
-    ("choice", re.compile(r"\b(?:select|choose|pick|option|one of)\b|중 하나", re.IGNORECASE)),
-    (
-        "approval",
-        re.compile(
-            r"(?:\bif you want\b|\bwould you like me to\b|\bshall i\b|\bi can\b.*\bfor you\b|\bwant me to\b|원하면|원하시면|원하신다면|바로 .*해드리겠습니다|바꿔드리겠습니다|정리하겠습니다|진행할까요)",
-            re.IGNORECASE,
-        ),
-    ),
 )
+
+CHOICE_PATTERN = re.compile(r"\b(?:select|choose|pick|option|one of)\b|중 하나", re.IGNORECASE)
+APPROVAL_PATTERN = re.compile(
+    r"(?:\bif you want\b|\bwould you like me to\b|\bshall i\b|\bwant me to\b|\bi can\b|원하면|원하시면|원하신다면)",
+    re.IGNORECASE,
+)
+QUESTION_PATTERN = re.compile(r"\?")
+KOREAN_OFFER_ENDING = re.compile(r"(?:드릴게요|드리겠습니다|하겠습니다|해드리겠습니다|진행할까요)$")
 
 
 def detect_interrupt(lines: list[str], context_window: int = 8) -> Interrupt | None:
@@ -24,7 +24,7 @@ def detect_interrupt(lines: list[str], context_window: int = 8) -> Interrupt | N
         line = lines[index].strip()
         if not line:
             continue
-        for kind, pattern in PROMPT_PATTERNS:
+        for kind, pattern in LINE_PATTERNS:
             if pattern.search(line):
                 start = max(0, index - context_window)
                 return Interrupt(
@@ -33,6 +33,22 @@ def detect_interrupt(lines: list[str], context_window: int = 8) -> Interrupt | N
                     context=lines[start : index + 1],
                     kind=kind,
                 )
+        if CHOICE_PATTERN.search(line):
+            start = max(0, index - context_window)
+            return Interrupt(
+                prompt="\n".join(lines[start : index + 1]),
+                prompt_line=line,
+                context=lines[start : index + 1],
+                kind="choice",
+            )
+        if APPROVAL_PATTERN.search(line):
+            start = max(0, index - context_window)
+            return Interrupt(
+                prompt="\n".join(lines[start : index + 1]),
+                prompt_line=line,
+                context=lines[start : index + 1],
+                kind="approval",
+            )
         if _looks_like_bulleted_choice(lines, index):
             start = max(0, index - context_window)
             return Interrupt(
@@ -59,17 +75,14 @@ def _detect_from_recent_context(lines: list[str], context_window: int = 8) -> In
     last_index = non_empty_indexes[-1]
     start = max(0, last_index - context_window + 1)
     context = lines[start : last_index + 1]
-    combined = _normalize_joined_text(context)
-    if not combined:
-        return None
-    for kind, pattern in PROMPT_PATTERNS:
-        if pattern.search(combined):
-            return Interrupt(
-                prompt="\n".join(context),
-                prompt_line=_last_semantic_line(context),
-                context=context,
-                kind=kind,
-            )
+    kind = _classify_candidate_block(context)
+    if kind is not None:
+        return Interrupt(
+            prompt="\n".join(context),
+            prompt_line=_last_semantic_line(context),
+            context=context,
+            kind=kind,
+        )
     if _looks_like_reply_request_context(context):
         return Interrupt(
             prompt="\n".join(context),
@@ -87,7 +100,8 @@ def extract_stalled_candidate(lines: list[str], context_window: int = 12) -> Int
     last_index = non_empty_indexes[-1]
     start = max(0, last_index - context_window + 1)
     context = lines[start : last_index + 1]
-    if not _looks_like_reply_request_context(context):
+    kind = _classify_candidate_block(context)
+    if kind is None and not _looks_like_reply_request_context(context):
         return None
     prompt_line = next((line.strip() for line in reversed(context) if line.strip()), "")
     if not prompt_line:
@@ -96,7 +110,7 @@ def extract_stalled_candidate(lines: list[str], context_window: int = 12) -> Int
         prompt="\n".join(context),
         prompt_line=prompt_line,
         context=context,
-        kind="stalled",
+        kind=kind or "stalled",
     )
 
 
@@ -126,6 +140,24 @@ def _normalize_joined_text(lines: list[str]) -> str:
         stripped = re.sub(r"\s+", " ", stripped)
         cleaned.append(stripped)
     return " ".join(cleaned).strip()
+
+
+def _classify_candidate_block(context: list[str]) -> str | None:
+    combined = _normalize_joined_text(context)
+    if not combined:
+        return None
+    if CHOICE_PATTERN.search(combined):
+        return "choice"
+    if APPROVAL_PATTERN.search(combined):
+        return "approval"
+    if QUESTION_PATTERN.search(combined):
+        return "question"
+    if KOREAN_OFFER_ENDING.search(combined):
+        return "approval"
+    for kind, pattern in LINE_PATTERNS:
+        if pattern.search(combined):
+            return kind
+    return None
 
 
 def _last_semantic_line(context: list[str]) -> str:
