@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from dataclasses import asdict, dataclass
 from getpass import getpass
 from pathlib import Path
@@ -63,31 +64,43 @@ def ensure_config() -> ProviderConfig:
 
 def run_first_time_setup() -> ProviderConfig:
     print("cli-officer first-time setup")
-    print("Choose officer model provider:")
-    print("1. OpenAI")
-    print("2. Anthropic")
-    provider = ""
-    while provider not in DEFAULT_MODELS:
-        choice = input("Provider [1/2]: ").strip()
-        if choice == "1":
-            provider = "openai"
-        elif choice == "2":
-            provider = "anthropic"
+    provider = choose_from_menu(
+        title="Choose officer model provider:",
+        choices={
+            "1": "openai",
+            "2": "anthropic",
+            "3": "exit",
+        },
+        labels={
+            "1": "OpenAI",
+            "2": "Anthropic",
+            "3": "Exit",
+        },
+        prompt="Provider [1/2/3]: ",
+    )
+    if provider == "exit":
+        raise SystemExit(0)
     api_key = ""
     while not api_key:
         api_key = getpass(f"{provider} API key: ").strip()
     model = DEFAULT_MODELS[provider]
     print(f"Using fixed officer model: {model}")
-    print("Choose coding agent:")
-    print("1. claude-code")
-    print("2. codex")
-    coding_agent = ""
-    while coding_agent not in CODING_AGENTS:
-        choice = input("Coding agent [1/2]: ").strip()
-        if choice == "1":
-            coding_agent = "claude-code"
-        elif choice == "2":
-            coding_agent = "codex"
+    coding_agent = choose_from_menu(
+        title="Choose coding agent:",
+        choices={
+            "1": "claude-code",
+            "2": "codex",
+            "3": "exit",
+        },
+        labels={
+            "1": "claude-code",
+            "2": "codex",
+            "3": "Exit",
+        },
+        prompt="Coding agent [1/2/3]: ",
+    )
+    if coding_agent == "exit":
+        raise SystemExit(0)
     print(f"Config will be stored at: {get_config_path()}")
     return ProviderConfig(
         officer_provider=provider,
@@ -95,3 +108,15 @@ def run_first_time_setup() -> ProviderConfig:
         officer_api_key=api_key,
         coding_agent=coding_agent,
     )
+
+
+def choose_from_menu(title: str, choices: dict[str, str], labels: dict[str, str], prompt: str) -> str:
+    print(title)
+    for key in ("1", "2", "3"):
+        if key in labels:
+            print(f"{key}. {labels[key]}")
+    while True:
+        selection = input(prompt).strip()
+        if selection in choices:
+            return choices[selection]
+        print("Invalid selection. Choose one of the listed numbers.", file=sys.stderr)

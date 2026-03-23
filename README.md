@@ -68,7 +68,7 @@ After that, you can run `cli-officer` from any repository.
 
 ## First Run
 
-On the first run, `cli-officer` asks you to configure two things:
+On the first run, `cli-officer` asks you to configure two things with numbered menus:
 
 - Officer model provider
 - Coding agent
@@ -77,11 +77,13 @@ Officer provider choices:
 
 - OpenAI -> fixed model `gpt-5-mini`
 - Anthropic -> fixed model `claude-3-5-sonnet-latest`
+- Exit
 
 Coding agent choices:
 
 - `claude-code`
 - `codex`
+- Exit
 
 Then it asks for the selected officer provider API key.
 
