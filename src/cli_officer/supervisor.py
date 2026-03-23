@@ -16,6 +16,7 @@ class Supervisor:
     judge: Judge
     target: str
     dry_run: bool = False
+    allow_hard_actions: bool = False
     log_events: bool = True
     history: list[str] = field(default_factory=list)
 
@@ -31,7 +32,7 @@ class Supervisor:
             self._log_result(result)
             return result
 
-        guarded = evaluate_guard(interrupt)
+        guarded = None if self.allow_hard_actions else evaluate_guard(interrupt)
         if guarded:
             result = SupervisorResult(interrupt, guarded, "blocked-by-policy")
             self._log_result(result)
@@ -65,10 +66,12 @@ class Supervisor:
             return
         prompt = result.interrupt.prompt_line.replace("\n", " ").strip()
         reply = result.reply_sent or result.decision.reply or "-"
+        rationale = result.decision.rationale or "-"
         print(
             f"[{timestamp}] {result.action_taken} kind={result.interrupt.kind} "
+            f"risk={result.decision.risk_level} "
             f"confidence={result.decision.confidence:.2f} "
-            f"reply={reply!r} prompt={prompt!r}",
+            f"reply={reply!r} reason={rationale!r} prompt={prompt!r}",
             file=sys.stdout,
             flush=True,
         )

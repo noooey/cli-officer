@@ -19,6 +19,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--interval", type=float, default=1.0, help="Polling interval in seconds")
     parser.add_argument("--once", action="store_true", help="Run a single poll cycle")
     parser.add_argument("--dry-run", action="store_true", help="Do not inject replies into tmux")
+    parser.add_argument("--hard", action="store_true", help="Allow even hard-blocked actions to be decided by the officer")
     parser.add_argument("--init", action="store_true", help="Run provider setup and exit")
     parser.add_argument("--launch", action="store_true", help="Create a 2-pane tmux session and launch the selected coding agent")
     parser.add_argument("--attach", action="store_true", help="Attach to the launched tmux session after bootstrapping it")
@@ -55,6 +56,7 @@ def main() -> int:
                 workdir=args.workdir,
                 interval=args.interval,
                 dry_run=args.dry_run,
+                allow_hard_actions=args.hard,
             )
             print(
                 json.dumps(
@@ -78,6 +80,7 @@ def main() -> int:
             judge=build_judge(config),
             target=target,
             dry_run=args.dry_run,
+            allow_hard_actions=args.hard,
             log_events=True,
         )
         if args.once:

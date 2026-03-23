@@ -9,6 +9,7 @@ DANGEROUS_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("git-history", re.compile(r"\b(?:git push|merge|rebase|reset --hard|push --force|force[- ]push)\b", re.IGNORECASE)),
     ("credential", re.compile(r"\b(?:token|password|secret|credential|api key|ssh key)\b", re.IGNORECASE)),
     ("privilege", re.compile(r"\b(?:sudo|root permission|elevated permission|administrator)\b", re.IGNORECASE)),
+    ("sandbox-bypass", re.compile(r"\b(?:without sandbox|retry without sandbox|bypass sandbox|disable sandbox)\b", re.IGNORECASE)),
     ("external-side-effect", re.compile(r"\b(?:deploy|production|publish|send request|call api|payment|billing)\b", re.IGNORECASE)),
 )
 

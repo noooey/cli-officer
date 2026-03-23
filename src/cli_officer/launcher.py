@@ -27,10 +27,12 @@ def resolve_worker_command(config: ProviderConfig) -> str:
         raise ValueError(f"Unsupported coding agent: {config.coding_agent}") from exc
 
 
-def build_officer_command(worker_pane: str, interval: float, dry_run: bool) -> str:
+def build_officer_command(worker_pane: str, interval: float, dry_run: bool, allow_hard_actions: bool) -> str:
     command = [sys.executable, "-m", "cli_officer", "--target", worker_pane, "--interval", str(interval)]
     if dry_run:
         command.append("--dry-run")
+    if allow_hard_actions:
+        command.append("--hard")
     return shlex.join(command)
 
 
@@ -41,10 +43,16 @@ def bootstrap_workspace(
     workdir: str,
     interval: float,
     dry_run: bool,
+    allow_hard_actions: bool,
 ) -> BootstrapResult:
     worker_command = resolve_worker_command(config)
     worker_pane = tmux_client.create_session(session_name=session_name, workdir=workdir, command=worker_command)
-    officer_command = build_officer_command(worker_pane=worker_pane, interval=interval, dry_run=dry_run)
+    officer_command = build_officer_command(
+        worker_pane=worker_pane,
+        interval=interval,
+        dry_run=dry_run,
+        allow_hard_actions=allow_hard_actions,
+    )
     officer_pane = tmux_client.split_window(target=worker_pane, workdir=workdir, command=officer_command)
     tmux_client.select_layout(target=worker_pane, layout="even-horizontal")
     tmux_client.select_pane(target=worker_pane)

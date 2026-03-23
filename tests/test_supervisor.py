@@ -98,6 +98,7 @@ class SupervisorTests(unittest.TestCase):
             workdir="/tmp/project",
             interval=1.0,
             dry_run=False,
+            allow_hard_actions=False,
         )
         
 
@@ -105,16 +106,17 @@ class SupervisorTests(unittest.TestCase):
         self.assertEqual(result.worker_pane, "%10")
         self.assertEqual(result.officer_pane, "%11")
         self.assertEqual(client.created, [("cli-officer", "/tmp/project", "codex")])
-        self.assertEqual(client.splits, [("%10", "/tmp/project", build_officer_command("%10", 1.0, False))])
+        self.assertEqual(client.splits, [("%10", "/tmp/project", build_officer_command("%10", 1.0, False, False))])
         self.assertEqual(client.layouts, [("%10", "even-horizontal")])
         self.assertEqual(client.selected_panes, ["%10"])
 
     def test_build_officer_command_targets_worker_pane(self) -> None:
-        command = build_officer_command(worker_pane="%10", interval=1.0, dry_run=True)
+        command = build_officer_command(worker_pane="%10", interval=1.0, dry_run=True, allow_hard_actions=True)
 
         self.assertIn("--target %10", command)
         self.assertIn("--interval 1.0", command)
         self.assertIn("--dry-run", command)
+        self.assertIn("--hard", command)
 
     def test_resolve_worker_command_for_claude(self) -> None:
         config = ProviderConfig(
@@ -177,6 +179,28 @@ class SupervisorTests(unittest.TestCase):
 
         self.assertIsNotNone(decision)
         self.assertEqual(decision.mode, DecisionMode.BLOCK)
+
+    def test_guard_detects_sandbox_bypass(self) -> None:
+        interrupt = Interrupt(
+            prompt="command failed; retry without sandbox?\n1. Yes\n2. No",
+            prompt_line="command failed; retry without sandbox?",
+            context=["command failed; retry without sandbox?", "1. Yes", "2. No"],
+            kind="confirm",
+        )
+
+        decision = evaluate_guard(interrupt)
+
+        self.assertIsNotNone(decision)
+        self.assertEqual(decision.mode, DecisionMode.BLOCK)
+        self.assertEqual(decision.risk_level, "sandbox-bypass")
+
+    def test_hard_mode_skips_policy_guard(self) -> None:
+        client = FakeTmuxClient([["command failed; retry without sandbox?", "Continue? [y/n]"]])
+        supervisor = Supervisor(client, HeuristicJudge(), "%1", dry_run=False, allow_hard_actions=True)
+
+        result = supervisor.poll_once()
+
+        self.assertNotEqual(result.action_taken, "blocked-by-policy")
 
     def test_reply_is_normalized_to_single_line(self) -> None:
         decision = Decision(True, "low", DecisionMode.AUTO, "yes\n*now*", 0.95, "")
