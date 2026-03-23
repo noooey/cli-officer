@@ -162,22 +162,31 @@ def _choose_with_text_prompt(
 def _choose_with_inline_menu(title: str, choices: dict[str, str], labels: dict[str, str], ordered_keys: list[str]) -> str:
     options = [(key, labels[key], choices[key]) for key in ordered_keys]
     selected = 0
-    printed_lines = 0
     fd = sys.stdin.fileno()
     previous = termios.tcgetattr(fd)
+    menu_height = 2 + len(options)
+    first_render = True
+
+    def render_menu() -> None:
+        lines = [title, "Use Up/Down and Enter."]
+        for index, (_, label, _) in enumerate(options):
+            if index == selected:
+                lines.append(f"\x1b[30;46;1m> {label}\x1b[0m")
+            else:
+                lines.append(f"  {label}")
+        sys.stdout.write("\x1b[?25l")
+        if not first_render:
+            sys.stdout.write(f"\x1b[{menu_height}F")
+        sys.stdout.write("\r\x1b[J")
+        sys.stdout.write("\n".join(lines))
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+
     try:
         tty.setraw(fd)
         while True:
-            if printed_lines:
-                sys.stdout.write(f"\x1b[{printed_lines}F")
-            lines = [title, "Use Up/Down and Enter."]
-            for index, (_, label, value) in enumerate(options):
-                prefix = "> " if index == selected else "  "
-                lines.append(f"{prefix}{label}")
-            sys.stdout.write("\n".join(lines) + "\n")
-            sys.stdout.flush()
-            printed_lines = len(lines)
-
+            render_menu()
+            first_render = False
             key = sys.stdin.read(1)
             if key == "\x1b":
                 sequence = key + sys.stdin.read(2)
@@ -190,9 +199,10 @@ def _choose_with_inline_menu(title: str, choices: dict[str, str], labels: dict[s
             elif key in ("j",):
                 selected = (selected + 1) % len(options)
             elif key in ("\r", "\n"):
-                sys.stdout.write(f"\x1b[{printed_lines}F")
-                sys.stdout.write("\x1b[J")
+                sys.stdout.write("\r\x1b[J\x1b[?25h")
                 sys.stdout.flush()
                 return options[selected][2]
     finally:
+        sys.stdout.write("\x1b[?25h")
+        sys.stdout.flush()
         termios.tcsetattr(fd, termios.TCSADRAIN, previous)
