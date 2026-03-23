@@ -57,6 +57,16 @@ def detect_interrupt(lines: list[str], context_window: int = 8) -> Interrupt | N
                 context=lines[start : index + 1],
                 kind="confirm",
             )
+        if re.match(r"^\d+[.)]\s+", line):
+            nearby = sum(1 for l in lines[max(0, index - 4):index + 4] if re.match(r"^\s*[›>]?\s*\d+[.)]\s+", l.strip()))
+            if nearby >= 2:
+                start = max(0, index - context_window)
+                return Interrupt(
+                    prompt="\n".join(lines[start : index + 1]),
+                    prompt_line=line,
+                    context=lines[start : index + 1],
+                    kind="choice",
+                )
         if _looks_like_bulleted_choice(lines, index):
             start = max(0, index - context_window)
             return Interrupt(
@@ -163,6 +173,9 @@ def _classify_candidate_block(context: list[str]) -> str | None:
         return "question"
     if KOREAN_OFFER_ENDING.search(combined):
         return "approval"
+    numbered = sum(1 for line in context if re.match(r"^\s*[›>]?\s*\d+[.)]\s+", line.strip()))
+    if numbered >= 2:
+        return "choice"
     for kind, pattern in LINE_PATTERNS:
         if pattern.search(combined):
             return kind
