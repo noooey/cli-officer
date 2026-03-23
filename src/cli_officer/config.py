@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import curses
 import json
 import os
 import sys
@@ -112,12 +113,51 @@ def run_first_time_setup() -> ProviderConfig:
 
 
 def choose_from_menu(title: str, choices: dict[str, str], labels: dict[str, str], prompt: str) -> str:
+    ordered_keys = [key for key in ("1", "2", "3") if key in labels]
+    if sys.stdin.isatty() and sys.stdout.isatty() and os.environ.get("TERM"):
+        return _choose_with_curses(title=title, choices=choices, labels=labels, ordered_keys=ordered_keys)
+    return _choose_with_text_prompt(title=title, choices=choices, labels=labels, ordered_keys=ordered_keys, prompt=prompt)
+
+
+def _choose_with_text_prompt(
+    title: str,
+    choices: dict[str, str],
+    labels: dict[str, str],
+    ordered_keys: list[str],
+    prompt: str,
+) -> str:
     print(title)
-    for key in ("1", "2", "3"):
-        if key in labels:
-            print(f"{key}. {labels[key]}")
+    for key in ordered_keys:
+        print(f"{key}. {labels[key]}")
     while True:
         selection = input(prompt).strip()
         if selection in choices:
             return choices[selection]
         print("Invalid selection. Choose one of the listed numbers.", file=sys.stderr)
+
+
+def _choose_with_curses(title: str, choices: dict[str, str], labels: dict[str, str], ordered_keys: list[str]) -> str:
+    options = [(key, labels[key], choices[key]) for key in ordered_keys]
+
+    def run_menu(stdscr: curses.window) -> str:
+        curses.curs_set(0)
+        stdscr.keypad(True)
+        selected = 0
+        while True:
+            stdscr.erase()
+            stdscr.addstr(0, 0, title)
+            stdscr.addstr(1, 0, "Use Up/Down and Enter.")
+            for index, (_, label, value) in enumerate(options):
+                prefix = "> " if index == selected else "  "
+                stdscr.addstr(index + 3, 0, f"{prefix}{label}")
+            stdscr.refresh()
+
+            key = stdscr.getch()
+            if key in (curses.KEY_UP, ord("k")):
+                selected = (selected - 1) % len(options)
+            elif key in (curses.KEY_DOWN, ord("j")):
+                selected = (selected + 1) % len(options)
+            elif key in (curses.KEY_ENTER, 10, 13):
+                return options[selected][2]
+
+    return curses.wrapper(run_menu)

@@ -79,7 +79,7 @@ After that, you can run `cli-officer` from any repository.
 
 ## First Run
 
-On the first run, `cli-officer` asks you to configure two things with numbered menus:
+On the first run, `cli-officer` asks you to configure two things with interactive menus:
 
 - Officer model provider
 - Coding agent
@@ -95,6 +95,8 @@ Coding agent choices:
 - `claude-code`
 - `codex`
 - Exit
+
+In a normal terminal, use `Up` / `Down` and `Enter` to choose. In non-interactive terminals it falls back to numbered input.
 
 Then it asks for the selected officer provider API key.
 
