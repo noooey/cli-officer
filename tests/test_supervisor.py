@@ -55,6 +55,15 @@ class LowConfidenceJudge:
         return Decision(True, "low", DecisionMode.AUTO, "yes", 0.5, "uncertain")
 
 
+class NoReplyJudge:
+    def __init__(self) -> None:
+        self.seen: list[Interrupt] = []
+
+    def decide(self, interrupt: Interrupt) -> Decision:
+        self.seen.append(interrupt)
+        return Decision(False, "low", DecisionMode.BLOCK, "", 0.0, "No reply needed", False)
+
+
 class SupervisorTests(unittest.TestCase):
     def test_config_round_trip(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -182,6 +191,24 @@ class SupervisorTests(unittest.TestCase):
         self.assertEqual(result.reply_sent, "yes")
         self.assertEqual(client.sent, [("%1", "yes")])
 
+    def test_bulleted_choice_picks_first_option(self) -> None:
+        client = FakeTmuxClient(
+            [[
+                "원하시면 다음 단계로 바로 이어서",
+                "- QA 체크리스트 형태",
+                "- 테스트케이스 표 형태",
+                "- Playwright용 시나리오 형태",
+                "중 하나로 바꿔서 정리하겠습니다.",
+            ]]
+        )
+        supervisor = Supervisor(client, HeuristicJudge(), "%1", dry_run=False)
+
+        result = supervisor.poll_once()
+
+        self.assertEqual(result.action_taken, "auto-replied")
+        self.assertEqual(result.reply_sent, "QA 체크리스트 형태")
+        self.assertEqual(client.sent, [("%1", "QA 체크리스트 형태")])
+
     def test_stalled_worker_retries_interrupt_detection(self) -> None:
         times = iter([0.0, 3.0])
         client = FakeTmuxClient([
@@ -196,6 +223,24 @@ class SupervisorTests(unittest.TestCase):
         self.assertEqual(first.action_taken, "auto-replied")
         self.assertEqual(second.action_taken, "noop")
         self.assertEqual(client.sent, [("%1", "yes")])
+
+    def test_stalled_worker_can_skip_non_prompt_context(self) -> None:
+        times = iter([0.0, 3.0])
+        judge = NoReplyJudge()
+        client = FakeTmuxClient([
+            ["Status update", "The migration completed successfully."],
+            ["Status update", "The migration completed successfully."],
+        ])
+        supervisor = Supervisor(client, judge, "%1", dry_run=False, now=lambda: next(times), stall_seconds=2.0)
+
+        first = supervisor.poll_once()
+        second = supervisor.poll_once()
+
+        self.assertEqual(first.action_taken, "observe")
+        self.assertEqual(second.action_taken, "noop")
+        self.assertEqual(client.sent, [])
+        self.assertEqual(len(judge.seen), 1)
+        self.assertEqual(judge.seen[0].kind, "stalled")
 
     def test_guard_detects_git_push(self) -> None:
         interrupt = Interrupt(

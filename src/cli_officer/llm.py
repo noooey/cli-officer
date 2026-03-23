@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import re
 from urllib import error, parse, request
 
 from .config import ProviderConfig
@@ -28,27 +29,36 @@ class HeuristicJudge(Judge):
         if interrupt.kind == "path":
             return Decision(True, "medium", DecisionMode.AUTO, self.default_path, 0.78, "Path request")
         if interrupt.kind == "choice":
-            reply = self._pick_choice(prompt)
-            return Decision(True, "medium", DecisionMode.SUGGEST, reply, 0.55, "Choice prompt")
+            reply = self._pick_choice(prompt, interrupt.context)
+            return Decision(True, "medium", DecisionMode.AUTO if reply else DecisionMode.SUGGEST, reply, 0.74 if reply else 0.55, "Choice prompt")
+        if interrupt.kind == "stalled":
+            return Decision(False, "unknown", DecisionMode.BLOCK, "", 0.0, "No explicit reply request detected", False)
         return Decision(True, "unknown", DecisionMode.SUGGEST, "", 0.35, "Unknown prompt")
 
     @staticmethod
-    def _pick_choice(prompt: str) -> str:
+    def _pick_choice(prompt: str, context: list[str]) -> str:
         if "[y/n]" in prompt or "yes/no" in prompt:
             return "yes"
         if "1" in prompt:
             return "1"
+        for line in context:
+            stripped = line.strip()
+            if stripped.startswith("- ") or stripped.startswith("* "):
+                candidate = re.sub(r"^[-*]\s+", "", stripped).strip()
+                if candidate:
+                    return candidate
         return ""
 
 
 SYSTEM_PROMPT = """You are a CLI officer for a coding agent.
 Return JSON only with keys:
-interrupt_detected, risk_level, mode, reply, confidence, rationale
+interrupt_detected, risk_level, mode, reply, confidence, rationale, needs_reply
 
 Rules:
 - mode must be one of: auto, suggest, block
 - reply must be a single line terminal-safe input with no explanation
 - do not invent secrets, paths, or unknown values
+- if the worker is not clearly waiting for user input, set needs_reply to false
 - prefer suggest or block if uncertain
 """
 
@@ -62,8 +72,9 @@ OPENAI_DECISION_SCHEMA = {
         "reply": {"type": "string"},
         "confidence": {"type": "number"},
         "rationale": {"type": "string"},
+        "needs_reply": {"type": "boolean"},
     },
-    "required": ["interrupt_detected", "risk_level", "mode", "reply", "confidence", "rationale"],
+    "required": ["interrupt_detected", "risk_level", "mode", "reply", "confidence", "rationale", "needs_reply"],
 }
 
 
@@ -84,6 +95,7 @@ class APIDecisionJudge(Judge):
                 reply="",
                 confidence=0.0,
                 rationale=f"LLM API unavailable: {exc}",
+                needs_reply=True,
             )
 
     def _call_api(self, interrupt: Interrupt) -> dict:
@@ -172,6 +184,7 @@ class APIDecisionJudge(Judge):
             reply=str(payload.get("reply", "")),
             confidence=confidence,
             rationale=str(payload.get("rationale", "")),
+            needs_reply=bool(payload.get("needs_reply", True)),
         )
 
 

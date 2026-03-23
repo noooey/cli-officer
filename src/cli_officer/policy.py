@@ -48,4 +48,5 @@ def enforce_thresholds(decision: Decision) -> Decision:
         reply=reply,
         confidence=decision.confidence,
         rationale=decision.rationale,
+        needs_reply=decision.needs_reply,
     )

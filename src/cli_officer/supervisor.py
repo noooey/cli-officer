@@ -4,7 +4,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 
-from .detector import detect_interrupt
+from .detector import detect_interrupt, extract_stalled_candidate
 from .llm import Judge
 from .models import DecisionMode, SupervisorResult
 from .policy import enforce_thresholds, evaluate_guard
@@ -30,13 +30,15 @@ class Supervisor:
         if lines != self.history:
             self.history = list(lines)
             self.last_change_at = current_time
-            return self._evaluate_lines(lines)
+            return self._evaluate_lines(lines, stalled=False)
         if current_time - self.last_change_at < self.stall_seconds:
             return SupervisorResult(None, None, "noop")
-        return self._evaluate_lines(lines)
+        return self._evaluate_lines(lines, stalled=True)
 
-    def _evaluate_lines(self, lines: list[str]) -> SupervisorResult:
+    def _evaluate_lines(self, lines: list[str], stalled: bool) -> SupervisorResult:
         interrupt = detect_interrupt(lines)
+        if not interrupt and stalled:
+            interrupt = extract_stalled_candidate(lines)
         if not interrupt:
             result = SupervisorResult(None, None, "observe")
             self._log_result(result)
@@ -53,6 +55,9 @@ class Supervisor:
             return result
 
         decision = enforce_thresholds(self.judge.decide(interrupt))
+        if not decision.needs_reply or not decision.interrupt_detected:
+            self.last_handled_signature = signature
+            return SupervisorResult(None, None, "noop")
         if decision.mode == DecisionMode.AUTO and decision.reply:
             if not self.dry_run:
                 self.tmux_client.send_keys(self.target, decision.reply)

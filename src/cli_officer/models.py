@@ -26,6 +26,7 @@ class Decision:
     reply: str
     confidence: float
     rationale: str = ""
+    needs_reply: bool = True
 
 
 @dataclass(slots=True)
