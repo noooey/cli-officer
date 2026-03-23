@@ -191,6 +191,24 @@ class SupervisorTests(unittest.TestCase):
         self.assertEqual(result.reply_sent, "yes")
         self.assertEqual(client.sent, [("%1", "yes")])
 
+    def test_wrapped_approval_prompt_is_detected_from_recent_context(self) -> None:
+        client = FakeTmuxClient(
+            [[
+                "테스트 우선순위만 추리면 DM 입력/전송, brief 확인 대기, workflow 시작",
+                "원하면 다음 턴에 이걸 바로 Playwright│",
+                "시나리오 목록으로 쪼개서 테스트 케이 │",
+                "스 문서나 실제 테스트 파일까지 만들어│",
+                "드릴게요.",
+            ]]
+        )
+        supervisor = Supervisor(client, HeuristicJudge(), "%1", dry_run=False)
+
+        result = supervisor.poll_once()
+
+        self.assertEqual(result.action_taken, "auto-replied")
+        self.assertEqual(result.reply_sent, "yes")
+        self.assertEqual(client.sent, [("%1", "yes")])
+
     def test_bulleted_choice_picks_first_option(self) -> None:
         client = FakeTmuxClient(
             [[

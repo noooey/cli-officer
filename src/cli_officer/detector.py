@@ -49,6 +49,34 @@ def detect_interrupt(lines: list[str], context_window: int = 8) -> Interrupt | N
                 context=lines[start : index + 1],
                 kind="question",
             )
+    return _detect_from_recent_context(lines, context_window=context_window)
+
+
+def _detect_from_recent_context(lines: list[str], context_window: int = 8) -> Interrupt | None:
+    non_empty_indexes = [index for index, line in enumerate(lines) if line.strip()]
+    if not non_empty_indexes:
+        return None
+    last_index = non_empty_indexes[-1]
+    start = max(0, last_index - context_window + 1)
+    context = lines[start : last_index + 1]
+    combined = _normalize_joined_text(context)
+    if not combined:
+        return None
+    for kind, pattern in PROMPT_PATTERNS:
+        if pattern.search(combined):
+            return Interrupt(
+                prompt="\n".join(context),
+                prompt_line=_last_semantic_line(context),
+                context=context,
+                kind=kind,
+            )
+    if _looks_like_reply_request_context(context):
+        return Interrupt(
+            prompt="\n".join(context),
+            prompt_line=_last_semantic_line(context),
+            context=context,
+            kind="question",
+        )
     return None
 
 
@@ -86,6 +114,26 @@ def _looks_like_reply_request_context(context: list[str]) -> bool:
         if stripped.startswith("- ") or stripped.startswith("* "):
             bullet_count += 1
     return bullet_count >= 2 or numbered_count >= 2
+
+
+def _normalize_joined_text(lines: list[str]) -> str:
+    cleaned: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        stripped = stripped.replace("│", " ")
+        stripped = re.sub(r"\s+", " ", stripped)
+        cleaned.append(stripped)
+    return " ".join(cleaned).strip()
+
+
+def _last_semantic_line(context: list[str]) -> str:
+    for line in reversed(context):
+        stripped = line.strip()
+        if stripped:
+            return stripped.replace("│", " ").strip()
+    return ""
 
 
 def _looks_like_bulleted_choice(lines: list[str], index: int) -> bool:
