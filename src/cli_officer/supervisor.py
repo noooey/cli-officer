@@ -87,13 +87,19 @@ class Supervisor:
         if result.interrupt is None or result.decision is None:
             return
         prompt = result.interrupt.prompt_line.replace("\n", " ").strip()
-        reply = result.reply_sent or result.decision.reply or "-"
         rationale = result.decision.rationale or "-"
+        reply_field = "reply"
+        reply_value = result.decision.reply or "-"
+        if result.action_taken == "auto-replied":
+            reply_field = "sent"
+            reply_value = result.reply_sent or "-"
+        elif result.action_taken in {"suggested", "blocked", "blocked-by-policy"}:
+            reply_field = "candidate"
         print(
             f"[{timestamp}] {result.action_taken} kind={result.interrupt.kind} "
             f"risk={result.decision.risk_level} "
             f"confidence={result.decision.confidence:.2f} "
-            f"reply={reply!r} reason={rationale!r} prompt={prompt!r}",
+            f"{reply_field}={reply_value!r} reason={rationale!r} prompt={prompt!r}",
             file=sys.stdout,
             flush=True,
         )
