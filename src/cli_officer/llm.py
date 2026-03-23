@@ -157,12 +157,16 @@ class APIDecisionJudge(Judge):
         return json.loads(text)
 
     @staticmethod
-    def _build_user_prompt(interrupt: Interrupt) -> str:
+    def _clean_line(line: str) -> str:
+        return re.sub(r"\s+", " ", line.replace("│", " ").replace("|", " ")).strip()
+
+    @classmethod
+    def _build_user_prompt(cls, interrupt: Interrupt) -> str:
         return json.dumps(
             {
                 "kind": interrupt.kind,
-                "prompt_line": interrupt.prompt_line,
-                "context": interrupt.context,
+                "prompt_line": cls._clean_line(interrupt.prompt_line),
+                "context": [cls._clean_line(l) for l in interrupt.context if l.strip()],
             },
             ensure_ascii=True,
         )
