@@ -158,3 +158,54 @@ def build_judge(config: ProviderConfig | None) -> Judge:
     if config is None:
         return fallback
     return APIDecisionJudge(config=config, fallback=fallback)
+
+
+def validate_provider_config(config: ProviderConfig) -> None:
+    if config.officer_provider == "openai":
+        _validate_openai(config)
+        return
+    if config.officer_provider == "anthropic":
+        _validate_anthropic(config)
+        return
+    raise ValueError(f"Unsupported provider: {config.officer_provider}")
+
+
+def _validate_openai(config: ProviderConfig) -> None:
+    body = {
+        "model": config.officer_model,
+        "input": "Reply with OK.",
+        "max_output_tokens": 8,
+    }
+    req = request.Request(
+        "https://api.openai.com/v1/responses",
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {config.officer_api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    with request.urlopen(req, timeout=30) as response:
+        if response.status >= 400:
+            raise ValueError(f"OpenAI validation failed with status {response.status}")
+
+
+def _validate_anthropic(config: ProviderConfig) -> None:
+    body = {
+        "model": config.officer_model,
+        "max_tokens": 8,
+        "messages": [{"role": "user", "content": "Reply with OK."}],
+    }
+    req = request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "x-api-key": config.officer_api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        },
+        method="POST",
+    )
+    with request.urlopen(req, timeout=30) as response:
+        if response.status >= 400:
+            raise ValueError(f"Anthropic validation failed with status {response.status}")

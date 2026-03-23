@@ -82,11 +82,9 @@ def run_first_time_setup() -> ProviderConfig:
     )
     if provider == "exit":
         raise SystemExit(0)
-    api_key = ""
-    while not api_key:
-        api_key = getpass(f"{provider} API key: ").strip()
     model = DEFAULT_MODELS[provider]
     print(f"Using fixed officer model: {model}")
+    api_key = prompt_valid_api_key(provider=provider, model=model)
     coding_agent = choose_from_menu(
         title="Choose coding agent:",
         choices={
@@ -110,6 +108,30 @@ def run_first_time_setup() -> ProviderConfig:
         officer_api_key=api_key,
         coding_agent=coding_agent,
     )
+
+
+def prompt_valid_api_key(provider: str, model: str) -> str:
+    from .llm import validate_provider_config
+
+    while True:
+        api_key = getpass(f"{provider} API key: ").strip()
+        if not api_key:
+            print("API key cannot be empty.", file=sys.stderr)
+            continue
+        try:
+            validate_provider_config(
+                ProviderConfig(
+                    officer_provider=provider,
+                    officer_model=model,
+                    officer_api_key=api_key,
+                    coding_agent="codex",
+                )
+            )
+            print("API key validated successfully.")
+            return api_key
+        except Exception as exc:
+            print(f"API key validation failed: {exc}", file=sys.stderr)
+            print("Enter a different key or press Ctrl+C to exit.", file=sys.stderr)
 
 
 def choose_from_menu(title: str, choices: dict[str, str], labels: dict[str, str], prompt: str) -> str:

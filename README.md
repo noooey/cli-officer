@@ -98,7 +98,7 @@ Coding agent choices:
 
 In a normal terminal, use `Up` / `Down` and `Enter` to choose. In non-interactive terminals it falls back to numbered input.
 
-Then it asks for the selected officer provider API key.
+Then it asks for the selected officer provider API key and validates it before moving to the next setup step.
 
 The config is stored at `~/.config/cli-officer/config.json` with file mode `600`.
 
