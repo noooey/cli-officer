@@ -37,10 +37,10 @@ def normalize_reply(reply: str) -> str:
 def enforce_thresholds(decision: Decision) -> Decision:
     reply = normalize_reply(decision.reply)
     mode = decision.mode
-    if decision.confidence < 0.4:
+    if decision.needs_reply and reply and decision.interrupt_detected:
+        mode = DecisionMode.AUTO
+    elif decision.confidence < 0.4:
         mode = DecisionMode.BLOCK
-    elif decision.confidence < 0.7 and mode == DecisionMode.AUTO:
-        mode = DecisionMode.SUGGEST
     return Decision(
         interrupt_detected=decision.interrupt_detected,
         risk_level=decision.risk_level,

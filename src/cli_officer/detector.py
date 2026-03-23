@@ -59,6 +59,8 @@ def extract_stalled_candidate(lines: list[str], context_window: int = 12) -> Int
     last_index = non_empty_indexes[-1]
     start = max(0, last_index - context_window + 1)
     context = lines[start : last_index + 1]
+    if not _looks_like_reply_request_context(context):
+        return None
     prompt_line = next((line.strip() for line in reversed(context) if line.strip()), "")
     if not prompt_line:
         return None
@@ -68,6 +70,22 @@ def extract_stalled_candidate(lines: list[str], context_window: int = 12) -> Int
         context=context,
         kind="stalled",
     )
+
+
+def _looks_like_reply_request_context(context: list[str]) -> bool:
+    bullet_count = 0
+    numbered_count = 0
+    for line in context:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if "?" in stripped:
+            return True
+        if re.match(r"^\d+[.)]\s+", stripped):
+            numbered_count += 1
+        if stripped.startswith("- ") or stripped.startswith("* "):
+            bullet_count += 1
+    return bullet_count >= 2 or numbered_count >= 2
 
 
 def _looks_like_bulleted_choice(lines: list[str], index: int) -> bool:

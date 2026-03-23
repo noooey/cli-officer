@@ -172,9 +172,9 @@ class SupervisorTests(unittest.TestCase):
 
         result = supervisor.poll_once()
 
-        self.assertEqual(result.action_taken, "suggested")
-        self.assertEqual(client.sent, [])
-        self.assertEqual(result.decision.mode, DecisionMode.SUGGEST)
+        self.assertEqual(result.action_taken, "auto-replied")
+        self.assertEqual(client.sent, [("%1", "yes")])
+        self.assertEqual(result.decision.mode, DecisionMode.AUTO)
 
     def test_natural_language_approval_auto_replies(self) -> None:
         client = FakeTmuxClient(
@@ -237,10 +237,44 @@ class SupervisorTests(unittest.TestCase):
         second = supervisor.poll_once()
 
         self.assertEqual(first.action_taken, "observe")
-        self.assertEqual(second.action_taken, "noop")
+        self.assertEqual(second.action_taken, "observe")
         self.assertEqual(client.sent, [])
-        self.assertEqual(len(judge.seen), 1)
-        self.assertEqual(judge.seen[0].kind, "stalled")
+        self.assertEqual(judge.seen, [])
+
+    def test_stalled_worker_ignores_plain_manual_input_like_line(self) -> None:
+        times = iter([0.0, 3.0])
+        judge = NoReplyJudge()
+        client = FakeTmuxClient([
+            ["status summary", "이걸 qa 체크리스트로 바꿔줘"],
+            ["status summary", "이걸 qa 체크리스트로 바꿔줘"],
+        ])
+        supervisor = Supervisor(client, judge, "%1", dry_run=False, now=lambda: next(times), stall_seconds=2.0)
+
+        first = supervisor.poll_once()
+        second = supervisor.poll_once()
+
+        self.assertEqual(first.action_taken, "observe")
+        self.assertEqual(second.action_taken, "observe")
+        self.assertEqual(client.sent, [])
+        self.assertEqual(judge.seen, [])
+
+    def test_recent_sent_reply_echo_is_ignored_on_next_capture(self) -> None:
+        times = iter([0.0, 1.0, 3.5])
+        client = FakeTmuxClient([
+            ["Continue? [y/n]"],
+            ["Continue? [y/n]", "yes"],
+            ["Continue? [y/n]", "yes"],
+        ])
+        supervisor = Supervisor(client, HeuristicJudge(), "%1", dry_run=False, now=lambda: next(times), stall_seconds=2.0)
+
+        first = supervisor.poll_once()
+        second = supervisor.poll_once()
+        third = supervisor.poll_once()
+
+        self.assertEqual(first.action_taken, "auto-replied")
+        self.assertEqual(second.action_taken, "noop")
+        self.assertEqual(third.action_taken, "noop")
+        self.assertEqual(client.sent, [("%1", "yes")])
 
     def test_guard_detects_git_push(self) -> None:
         interrupt = Interrupt(
@@ -276,6 +310,16 @@ class SupervisorTests(unittest.TestCase):
         result = supervisor.poll_once()
 
         self.assertNotEqual(result.action_taken, "blocked-by-policy")
+
+    def test_hard_mode_auto_approves_suggested_reply(self) -> None:
+        client = FakeTmuxClient([["Operation failed", "Retry? [y/n]"]])
+        supervisor = Supervisor(client, LowConfidenceJudge(), "%1", dry_run=False, allow_hard_actions=True)
+
+        result = supervisor.poll_once()
+
+        self.assertEqual(result.action_taken, "auto-replied")
+        self.assertEqual(result.reply_sent, "yes")
+        self.assertEqual(client.sent, [("%1", "yes")])
 
     def test_reply_is_normalized_to_single_line(self) -> None:
         decision = Decision(True, "low", DecisionMode.AUTO, "yes\n*now*", 0.95, "")

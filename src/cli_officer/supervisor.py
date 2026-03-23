@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import sys
 import time
+from collections import deque
 from dataclasses import dataclass, field
 
 from .detector import detect_interrupt, extract_stalled_candidate
 from .llm import Judge
-from .models import DecisionMode, SupervisorResult
+from .models import Decision, DecisionMode, SupervisorResult
 from .policy import enforce_thresholds, evaluate_guard
 
 
@@ -23,9 +24,11 @@ class Supervisor:
     history: list[str] = field(default_factory=list)
     last_change_at: float = field(default_factory=time.monotonic)
     last_handled_signature: str = ""
+    recent_sent_replies: deque[str] = field(default_factory=lambda: deque(maxlen=8))
 
     def poll_once(self) -> SupervisorResult:
         lines = self.tmux_client.capture_pane(self.target)
+        lines = self._strip_recent_sent_echoes(lines)
         current_time = self.now()
         if lines != self.history:
             self.history = list(lines)
@@ -55,12 +58,15 @@ class Supervisor:
             return result
 
         decision = enforce_thresholds(self.judge.decide(interrupt))
+        if self.allow_hard_actions:
+            decision = self._apply_hard_override(decision)
         if not decision.needs_reply or not decision.interrupt_detected:
             self.last_handled_signature = signature
             return SupervisorResult(None, None, "noop")
         if decision.mode == DecisionMode.AUTO and decision.reply:
             if not self.dry_run:
                 self.tmux_client.send_keys(self.target, decision.reply)
+                self._remember_sent_reply(decision.reply)
             self.last_handled_signature = signature
             result = SupervisorResult(interrupt, decision, "auto-replied", reply_sent=decision.reply)
             self._log_result(result)
@@ -107,3 +113,45 @@ class Supervisor:
     @staticmethod
     def _interrupt_signature(interrupt: object) -> str:
         return f"{interrupt.kind}|{interrupt.prompt_line}|{interrupt.prompt}"
+
+    def _remember_sent_reply(self, reply: str) -> None:
+        normalized = " ".join(reply.strip().split())
+        if normalized:
+            self.recent_sent_replies.append(normalized)
+
+    def _strip_recent_sent_echoes(self, lines: list[str]) -> list[str]:
+        if not self.recent_sent_replies:
+            return lines
+        trimmed = list(lines)
+        while trimmed:
+            candidate = trimmed[-1].strip()
+            if not candidate:
+                trimmed.pop()
+                continue
+            normalized = " ".join(candidate.split())
+            if normalized in self.recent_sent_replies:
+                trimmed.pop()
+                continue
+            break
+        return trimmed
+
+    @staticmethod
+    def _apply_hard_override(decision: Decision) -> Decision:
+        if not decision.reply or not decision.needs_reply or not decision.interrupt_detected:
+            return decision
+        if decision.mode == DecisionMode.AUTO:
+            return decision
+        rationale = decision.rationale
+        if rationale:
+            rationale = f"{rationale}; hard override auto-approved"
+        else:
+            rationale = "Hard override auto-approved"
+        return Decision(
+            interrupt_detected=decision.interrupt_detected,
+            risk_level=decision.risk_level,
+            mode=DecisionMode.AUTO,
+            reply=decision.reply,
+            confidence=decision.confidence,
+            rationale=rationale,
+            needs_reply=decision.needs_reply,
+        )
