@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cli-officer"
+version = "0.1.0"
+description = "Aggressive supervisor for long-running CLI coding agents."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [
+  { name = "Codex" }
+]
+dependencies = []
+
+[project.scripts]
+cli-officer = "cli_officer.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
