@@ -12,7 +12,7 @@ LINE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 
 CHOICE_PATTERN = re.compile(r"\b(?:select|choose|pick|option|one of)\b|중 하나", re.IGNORECASE)
 APPROVAL_PATTERN = re.compile(
-    r"(?:\bif you want\b|\bwould you like me to\b|\bshall i\b|\bwant me to\b|\bi can\b|원하면|원하시면|원하신다면)",
+    r"(?:\bif you want\b|\bwould you like me to\b|\bshall i\b|\bwant me to\b|원하면|원하시면|원하신다면)",
     re.IGNORECASE,
 )
 QUESTION_PATTERN = re.compile(r"\?")

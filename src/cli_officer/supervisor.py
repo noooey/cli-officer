@@ -60,7 +60,7 @@ class Supervisor:
             self._log_result(result)
             return result
 
-        heuristic_kinds = {"confirm", "approval", "retry"}
+        heuristic_kinds = {"confirm", "retry"}
         active_judge = (
             HeuristicJudge()
             if self.allow_hard_actions or interrupt.kind in heuristic_kinds
