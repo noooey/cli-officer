@@ -35,7 +35,7 @@ class Supervisor:
         if lines != self.history:
             self.history = list(lines)
             self.last_change_at = current_time
-            return self._evaluate_lines(lines, stalled=False)
+            return SupervisorResult(None, None, "observe")
         if current_time - self.last_change_at < self.stall_seconds:
             return SupervisorResult(None, None, "noop")
         return self._evaluate_lines(lines, stalled=True)
@@ -45,6 +45,7 @@ class Supervisor:
         if not interrupt and stalled:
             interrupt = extract_stalled_candidate(lines)
         if not interrupt:
+            self.last_handled_signature = ""
             result = SupervisorResult(None, None, "observe")
             self._log_result(result)
             return result
@@ -111,7 +112,7 @@ class Supervisor:
 
     @staticmethod
     def _interrupt_signature(interrupt: object) -> str:
-        return f"{interrupt.kind}|{interrupt.prompt_line}|{interrupt.prompt}"
+        return f"{interrupt.kind}|{interrupt.prompt_line}"
 
     def _remember_sent_reply(self, reply: str) -> None:
         normalized = " ".join(reply.strip().split())
