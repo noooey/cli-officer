@@ -22,7 +22,9 @@ class HeuristicJudge(Judge):
     def decide(self, interrupt: Interrupt) -> Decision:
         prompt = interrupt.prompt_line.lower()
         if interrupt.kind == "confirm":
-            return Decision(True, "low", DecisionMode.AUTO, "yes", 0.92, "Standard confirmation")
+            if re.match(r"^[›>]\s*\d+", interrupt.prompt_line):
+                return Decision(True, "low", DecisionMode.AUTO, "", 0.92, "Interactive menu — confirm current selection")
+            return Decision(True, "low", DecisionMode.AUTO, "y", 0.92, "Standard confirmation")
         if interrupt.kind == "approval":
             return Decision(True, "low", DecisionMode.AUTO, "yes", 0.86, "Natural-language approval prompt")
         if interrupt.kind == "retry":

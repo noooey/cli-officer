@@ -65,7 +65,9 @@ class TmuxClient:
         return self._run([self.binary, "capture-pane", "-p", "-S", f"-{lines}", "-t", target]).splitlines()
 
     def send_keys(self, target: str, text: str, enter: bool = True) -> None:
-        commands = [[self.binary, "send-keys", "-t", target, text]]
+        commands = []
+        if text:
+            commands.append([self.binary, "send-keys", "-t", target, text])
         if enter:
             commands.append([self.binary, "send-keys", "-t", target, "Enter"])
         for command in commands:
